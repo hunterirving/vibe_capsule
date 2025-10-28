@@ -248,7 +248,9 @@ function updateVisualProgress(event) {
 	if (!playerReady) return;
 
 	const rect = progressBar.getBoundingClientRect();
-	const clickPosition = event.clientX - rect.left;
+	// Support both mouse and touch events
+	const clientX = event.touches ? event.touches[0].clientX : event.clientX;
+	const clickPosition = clientX - rect.left;
 	const clickPercentage = Math.max(0, Math.min(1, clickPosition / rect.width));
 
 	progressBar.style.setProperty('--progress', `${clickPercentage * 100}%`);
@@ -319,9 +321,16 @@ function onProgressMouseUp(event) {
 playPauseBtn.addEventListener('click', togglePlayPause);
 nextBtn.addEventListener('click', nextSong);
 prevBtn.addEventListener('click', prevSong);
+
+// Mouse events for desktop
 progressContainer.addEventListener('mousedown', onProgressMouseDown);
 document.addEventListener('mousemove', onProgressMouseMove);
 document.addEventListener('mouseup', onProgressMouseUp);
+
+// Touch events for mobile
+progressContainer.addEventListener('touchstart', onProgressMouseDown, { passive: false });
+document.addEventListener('touchmove', onProgressMouseMove, { passive: false });
+document.addEventListener('touchend', onProgressMouseUp);
 
 // Keyboard controls
 document.addEventListener('keydown', function(event) {
