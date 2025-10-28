@@ -31,7 +31,7 @@ fetch('tracks.json')
 		songs = data;
 		if (songs.length > 0) {
 			playerReady = true;
-			updateCurrentSongDisplay(`Ready to play: ${songs[0].artist} - ${songs[0].title}`);
+			updateCurrentSongDisplay(`Ready to play: ${songs[0].artist} – ${songs[0].title}`);
 			renderPlaylist();
 			// Pre-cache resources first, then songs
 			preloadResources().then(() => {
@@ -50,9 +50,21 @@ fetch('tracks.json')
 audio.addEventListener('play', () => {
 	startProgressBar();
 	const song = songs[currentSongIndex];
-	updateCurrentSongDisplay(song.looping ?
-		`Looping: ${song.artist} - ${song.title}` :
-		`Now playing: ${song.artist} - ${song.title}`);
+	const songText = `${song.artist} – ${song.title}`;
+
+	// Always update display to ensure we remove "Ready to play:" prefix
+	const currentText = currentSongDisplay.querySelector('span')?.textContent || '';
+
+	// Check if it's a different song (not just play/pause of same song)
+	const isNewSong = !currentText.includes(songText);
+	const hasReadyToPlay = currentText.includes('Ready to play:');
+
+	if (isNewSong || hasReadyToPlay) {
+		updateCurrentSongDisplay(songText);
+	} else {
+		// Same song, just resume the marquee
+		resumeMarquee();
+	}
 
 	// Update media session metadata
 	if ('mediaSession' in navigator) {
@@ -65,11 +77,7 @@ audio.addEventListener('play', () => {
 
 audio.addEventListener('pause', () => {
 	stopProgressBar();
-	// Only show "Paused" if the user actually paused (not during track transitions or seeking)
-	if (!audio.ended && !isSeeking) {
-		const song = songs[currentSongIndex];
-		updateCurrentSongDisplay(`Paused: ${song.artist} - ${song.title}`);
-	}
+	pauseMarquee();
 });
 
 audio.addEventListener('ended', () => {
@@ -144,16 +152,6 @@ function toggleLooping(index) {
 		// Toggle looping
 		songs[index].looping = !(songs[index].looping || false);
 		renderPlaylist();
-
-		const song = songs[index];
-		// Update the display text based on current state
-		if (isPlaying) {
-			updateCurrentSongDisplay(song.looping ?
-				`Looping: ${song.artist} - ${song.title}` :
-				`Now playing: ${song.artist} - ${song.title}`);
-		} else {
-			updateCurrentSongDisplay(`Paused: ${song.artist} - ${song.title}`);
-		}
 	} else {
 		playSong(index);
 	}
@@ -188,7 +186,177 @@ function playSong(index) {
 
 function updateCurrentSongDisplay(text) {
 	currentSongDisplay.innerHTML = `<span>${text}</span>`;
+	// Initialize marquee effect after a brief delay to ensure DOM is updated
+	setTimeout(() => setupMarquee(), 50);
 }
+
+// Marquee state
+let marqueeAnimating = false;
+let marqueePaused = false;
+let marqueeTimeoutId = null;
+let marqueeOriginalText = '';
+let marqueeDuration = 0;
+let marqueeHalfWidth = 0;
+let marqueeTransitionEndHandler = null;
+let marqueeCurrentTransform = 'translateX(0)';
+
+function setupMarquee() {
+	const container = currentSongDisplay;
+	const textSpan = container.querySelector('span');
+
+	if (!textSpan) return;
+
+	// Clear any existing animation
+	if (marqueeTimeoutId) {
+		clearTimeout(marqueeTimeoutId);
+		marqueeTimeoutId = null;
+	}
+	if (marqueeTransitionEndHandler) {
+		textSpan.removeEventListener('transitionend', marqueeTransitionEndHandler);
+		marqueeTransitionEndHandler = null;
+	}
+	marqueeAnimating = false;
+	marqueePaused = false;
+
+	// Reset styles
+	textSpan.style.transition = 'none';
+	textSpan.style.transform = 'translateX(0)';
+	marqueeCurrentTransform = 'translateX(0)';
+	container.classList.remove('no-overflow');
+
+	// Store original text
+	marqueeOriginalText = textSpan.textContent;
+
+	// Force reflow
+	void textSpan.offsetWidth;
+
+	// Check if text overflows
+	const containerWidth = container.offsetWidth - 30; // Account for padding
+	const textWidth = textSpan.scrollWidth;
+	const overflows = textWidth > containerWidth;
+
+	if (!overflows) {
+		// No overflow - show ellipsis behavior
+		container.classList.add('no-overflow');
+		container.classList.remove('marquee-active');
+		return;
+	}
+
+	// Text overflows - setup marquee
+	marqueeAnimating = true;
+	container.classList.add('marquee-active');
+
+	// Add spacing and duplicate text for seamless loop
+	// Using non-breaking spaces (\u00A0) so they don't collapse in HTML
+	const spacing = '\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0'; // 12 non-breaking spaces
+	textSpan.textContent = marqueeOriginalText + spacing + marqueeOriginalText + spacing;
+
+	// Calculate animation parameters
+	const fullWidth = textSpan.scrollWidth;
+	marqueeHalfWidth = fullWidth / 2;
+	marqueeDuration = (marqueeHalfWidth / 50) * 1000; // Adjust speed here (pixels per second)
+
+	// Start animation after a brief delay (only if not paused)
+	// Don't start animation if already paused
+	if (!marqueePaused) {
+		marqueeTimeoutId = setTimeout(() => {
+			if (marqueePaused) return;
+
+			textSpan.style.transition = `transform ${marqueeDuration}ms linear`;
+			textSpan.style.transform = `translateX(-${marqueeHalfWidth}px)`;
+			marqueeCurrentTransform = `translateX(-${marqueeHalfWidth}px)`;
+
+			// Reset and loop
+			marqueeTransitionEndHandler = () => {
+				if (!marqueeAnimating || marqueePaused) return;
+
+				textSpan.style.transition = 'none';
+				textSpan.style.transform = 'translateX(0)';
+				marqueeCurrentTransform = 'translateX(0)';
+
+				setTimeout(() => {
+					if (!marqueeAnimating || marqueePaused) return;
+					textSpan.style.transition = `transform ${marqueeDuration}ms linear`;
+					textSpan.style.transform = `translateX(-${marqueeHalfWidth}px)`;
+					marqueeCurrentTransform = `translateX(-${marqueeHalfWidth}px)`;
+				}, 50);
+			};
+
+			textSpan.addEventListener('transitionend', marqueeTransitionEndHandler);
+		}, 1000); // Initial delay before starting scroll
+	}
+}
+
+function pauseMarquee() {
+	marqueePaused = true;
+	const textSpan = currentSongDisplay.querySelector('span');
+	if (!textSpan || !marqueeAnimating) return;
+
+	// Capture current transform position
+	const computedStyle = window.getComputedStyle(textSpan);
+	const currentTransform = computedStyle.transform;
+	marqueeCurrentTransform = currentTransform;
+
+	// Freeze at current position
+	textSpan.style.transition = 'none';
+	textSpan.style.transform = currentTransform;
+
+	// Clear any pending timeout
+	if (marqueeTimeoutId) {
+		clearTimeout(marqueeTimeoutId);
+		marqueeTimeoutId = null;
+	}
+}
+
+function resumeMarquee() {
+	if (!marqueeAnimating) return;
+	marqueePaused = false;
+
+	const textSpan = currentSongDisplay.querySelector('span');
+	if (!textSpan) return;
+
+	// Apply the stored transform position first
+	textSpan.style.transition = 'none';
+	textSpan.style.transform = marqueeCurrentTransform;
+
+	// Force reflow to apply the transform
+	void textSpan.offsetWidth;
+
+	// Get current position from the stored transform
+	const matrix = new DOMMatrix(marqueeCurrentTransform);
+	const currentX = matrix.m41;
+
+	// Calculate remaining distance and time
+	const distanceTraveled = Math.abs(currentX);
+	const percentComplete = distanceTraveled / marqueeHalfWidth;
+	const timeRemaining = marqueeDuration * (1 - percentComplete);
+
+	// Resume animation from current position
+	textSpan.style.transition = `transform ${timeRemaining}ms linear`;
+	textSpan.style.transform = `translateX(-${marqueeHalfWidth}px)`;
+	marqueeCurrentTransform = `translateX(-${marqueeHalfWidth}px)`;
+}
+
+// Add window resize listener to recalculate marquee
+window.addEventListener('resize', () => {
+	if (marqueeOriginalText) {
+		// Store the paused state before recalculating
+		const wasPaused = marqueePaused;
+
+		// Restore original text before recalculating
+		const textSpan = currentSongDisplay.querySelector('span');
+		if (textSpan) {
+			textSpan.textContent = marqueeOriginalText;
+		}
+
+		setupMarquee();
+
+		// Restore paused state after recalculation
+		if (wasPaused) {
+			marqueePaused = true;
+		}
+	}
+});
 
 function togglePlayPause() {
 	if (!playerReady) return;
@@ -336,12 +504,10 @@ function attemptSeekWithRetry(seekTime, targetPercentage) {
 		// Allow small tolerance for floating point comparison
 		if (Math.abs(audio.currentTime - targetSeekTime) > 0.5) {
 			// Browser clamped to buffered range - need to wait for more data
-			// Now pause and show seeking status
+			// Now pause during seeking
 			if (wasPlaying) {
 				audio.pause();
 			}
-			const song = songs[currentSongIndex];
-			updateCurrentSongDisplay(`Seeking: ${song.artist} - ${song.title}`);
 			continueSeekingToTarget(wasPlaying);
 		} else {
 			// Successfully reached target immediately (was already buffered)
@@ -355,11 +521,6 @@ function attemptSeekWithRetry(seekTime, targetPercentage) {
 }
 
 function continueSeekingToTarget(wasPlaying) {
-	const song = songs[currentSongIndex];
-
-	// Keep showing seeking status
-	updateCurrentSongDisplay(`Seeking: ${song.artist} - ${song.title}`);
-
 	// Handler for when more data loads
 	function retrySeek() {
 		if (!isSeeking || targetSeekTime === null) {
@@ -384,8 +545,6 @@ function continueSeekingToTarget(wasPlaying) {
 
 				if (wasPlaying) {
 					audio.play();
-				} else {
-					updateCurrentSongDisplay(`Paused: ${song.artist} - ${song.title}`);
 				}
 			}
 		}
@@ -549,7 +708,7 @@ function preloadNextSong() {
 		return;
 	}
 
-	console.log(`Preloading: ${song.artist} - ${song.title}`);
+	console.log(`Preloading: ${song.artist} – ${song.title}`);
 
 	// Use fetch to force full download of the entire file
 	fetch(`tracks/${filename}`)
@@ -606,7 +765,7 @@ function preloadNextSong() {
 				blob: blob
 			};
 
-			console.log(`✓ Fully preloaded: ${song.artist} - ${song.title}`);
+			console.log(`✓ Fully preloaded: ${song.artist} – ${song.title}`);
 
 			// Move to next song
 			currentPreloadIndex++;
@@ -657,7 +816,7 @@ function processPriorityPreload() {
 		return;
 	}
 
-	console.log(`🔥 Priority preloading: ${song.artist} - ${song.title}`);
+	console.log(`🔥 Priority preloading: ${song.artist} – ${song.title}`);
 
 	// Use fetch to force full download of the entire file
 	fetch(`tracks/${filename}`)

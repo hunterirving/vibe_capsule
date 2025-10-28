@@ -178,9 +178,15 @@ body {
 }
 
 .current-song span {
+	display: inline-block;
 	white-space: nowrap;
+	will-change: transform;
+}
+
+.current-song.no-overflow span {
 	overflow: hidden;
-	text-overflow: ellipsis;
+	text-overflow: hidden;
+	max-width: 100%;
 }
 
 #audioPlayer {
