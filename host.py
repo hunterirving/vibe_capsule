@@ -68,7 +68,7 @@ def main():
 			network_url = f"http://{local_ip}:{port}"
 
 			print("=" * 60)
-			print("🎧 vibe capsule")
+			print("💿 vibe capsule")
 			print("=" * 60)
 			print(f"\nServer running on port {port}")
 			print(f"\nLocal access:   {local_url}")
