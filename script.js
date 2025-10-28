@@ -229,7 +229,7 @@ function stopProgressBar() {
 }
 
 function resetProgressBar() {
-	progressBar.style.setProperty('--progress', '0%');
+	progressBar.style.setProperty('--progress', '0');
 }
 
 function updateProgressBar() {
@@ -238,8 +238,7 @@ function updateProgressBar() {
 		const duration = audio.duration;
 		const progressPercentage = (currentTime / duration) * 100;
 		const displayPercentage = isNaN(progressPercentage) ? 0 : progressPercentage;
-
-		progressBar.style.setProperty('--progress', `${displayPercentage}%`);
+		progressBar.style.setProperty('--progress', displayPercentage);
 	}
 }
 
@@ -256,7 +255,7 @@ function updateVisualProgress(event) {
 	const clickPosition = clientX - rect.left;
 	const clickPercentage = Math.max(0, Math.min(1, clickPosition / rect.width));
 
-	progressBar.style.setProperty('--progress', `${clickPercentage * 100}%`);
+	progressBar.style.setProperty('--progress', clickPercentage * 100);
 	return clickPercentage;
 }
 

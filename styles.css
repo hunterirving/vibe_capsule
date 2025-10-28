@@ -230,7 +230,7 @@ body {
 	background-color: var(--text);
 	position: relative;
 	border-radius: 1px;
-	--progress: 0%;
+	--progress: 0;
 	--circle-size: 16px;
 }
 
@@ -240,7 +240,7 @@ body {
 	left: 0;
 	top: 0;
 	height: 100%;
-	width: var(--progress);
+	width: calc((100% - var(--circle-size) + 2px) * var(--progress) / 100 + var(--circle-size) / 2);
 	background-color: var(--accent);
 	border-radius: 1px;
 	transition: none;
@@ -249,7 +249,7 @@ body {
 .progress-bar::after {
 	content: '';
 	position: absolute;
-	left: calc(var(--progress) - var(--circle-size) / 2);
+	left: calc((100% - var(--circle-size) + 2px) * var(--progress) / 100 - 1px);
 	top: 50%;
 	transform: translateY(-50%);
 	width: var(--circle-size);
