@@ -59,9 +59,8 @@ body {
 .controls {
 	display: flex;
 	justify-content: center;
-	padding-top: 10px;
-	padding-bottom: 10px;
-	height: 62px;
+	padding-left: 15px;
+	padding-right: 15px;
 	background: transparent;
 	position: absolute;
 	bottom: 0;
@@ -69,6 +68,7 @@ body {
 	right: 0;
 	box-sizing: border-box;
 	z-index: 3;
+	pointer-events: none;
 }
 
 .control-button {
@@ -79,7 +79,7 @@ body {
 	background-position: center;
 	border: none;
 	cursor: pointer;
-	margin: 0 7px;
+	margin: 0;
 	border-radius: 50%;
 	background-color: var(--text);
 	box-shadow:
@@ -91,6 +91,17 @@ body {
 		drop-shadow(0 0 1px rgba(0, 0, 0, 0.8))
 		drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.6))
 		drop-shadow(-0.5px -0.5px 0 rgba(255, 255, 255, 0.2));
+	pointer-events: auto;
+}
+
+.control-button:not(:last-child) {
+	margin-right: 14px;
+}
+
+.controls-inner {
+	display: flex;
+	padding: 10px 15px;
+	pointer-events: auto;
 }
 
 .playlist-wrapper {
