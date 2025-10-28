@@ -245,16 +245,20 @@ body {
 
 #playPause {
 	background-image: url('resources/play.png');
+	background-position: 53% center;
 }
 
 #playPause.pause {
 	background-image: url('resources/pause.png');
+	background-position: center;
 }
 
 #prev {
 	background-image: url('resources/prev.png');
+	background-position: 44% center;
 }
 
 #next {
 	background-image: url('resources/next.png');
+	background-position: 56% center;
 }
