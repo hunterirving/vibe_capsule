@@ -34,6 +34,8 @@ body {
 	flex-direction: column;
 	overflow: hidden;
 	position: relative;
+	padding-left: 10px;
+	padding-top: 10px;
 }
 
 .controls {
@@ -55,7 +57,7 @@ body {
 	flex-grow: 1;
 	position: relative;
 	overflow-y: auto;
-	padding-bottom: 72px;
+	padding-bottom: 60px;
 }
 
 .playlist {
@@ -119,7 +121,7 @@ body {
 .current-song {
 	text-align: left;
 	padding-left: 10px;
-	padding-bottom: 6px;
+	padding-bottom: 10px;
 	font-weight: bold;
 	color: var(--blueberry);
 	min-height: 35px;
@@ -161,7 +163,7 @@ body {
 	top: 0;
 	left: 0;
 	right: 0;
-	height: 16px;
+	height: 14px;
 	background: linear-gradient(
 		to bottom,
 		rgba(0, 0, 0, 0.8) 0%,
