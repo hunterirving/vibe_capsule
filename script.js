@@ -57,8 +57,11 @@ audio.addEventListener('play', () => {
 
 audio.addEventListener('pause', () => {
 	stopProgressBar();
-	const song = songs[currentSongIndex];
-	updateCurrentSongDisplay(`Paused: ${song.artist} - ${song.title}`);
+	// Only show "Paused" if the user actually paused (not during track transitions)
+	if (!audio.ended) {
+		const song = songs[currentSongIndex];
+		updateCurrentSongDisplay(`Paused: ${song.artist} - ${song.title}`);
+	}
 });
 
 audio.addEventListener('ended', () => {
