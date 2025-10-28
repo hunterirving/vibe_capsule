@@ -57,8 +57,8 @@ audio.addEventListener('play', () => {
 
 audio.addEventListener('pause', () => {
 	stopProgressBar();
-	// Only show "Paused" if the user actually paused (not during track transitions)
-	if (!audio.ended) {
+	// Only show "Paused" if the user actually paused (not during track transitions or seeking)
+	if (!audio.ended && !isSeeking) {
 		const song = songs[currentSongIndex];
 		updateCurrentSongDisplay(`Paused: ${song.artist} - ${song.title}`);
 	}
@@ -233,7 +233,7 @@ function resetProgressBar() {
 }
 
 function updateProgressBar() {
-	if (audio.duration && !isDragging) {
+	if (audio.duration && !isDragging && !isSeeking) {
 		const currentTime = audio.currentTime;
 		const duration = audio.duration;
 		const progressPercentage = (currentTime / duration) * 100;
@@ -259,6 +259,9 @@ function updateVisualProgress(event) {
 	return clickPercentage;
 }
 
+let isSeeking = false;
+let targetSeekTime = null;
+
 function applySeek(clickPercentage) {
 	if (!playerReady) return;
 
@@ -271,16 +274,111 @@ function applySeek(clickPercentage) {
 		audio.addEventListener('loadedmetadata', function setInitialTime() {
 			const duration = audio.duration;
 			const seekTime = duration * clickPercentage;
-			audio.currentTime = seekTime;
+			attemptSeekWithRetry(seekTime, clickPercentage);
 			prePlaySeekTime = seekTime;
 			audio.removeEventListener('loadedmetadata', setInitialTime);
 		}, { once: true });
 	} else if (audio.duration) {
 		const duration = audio.duration;
 		const seekTime = duration * clickPercentage;
-		audio.currentTime = seekTime;
+		attemptSeekWithRetry(seekTime, clickPercentage);
 		prePlaySeekTime = seekTime;
 	}
+}
+
+function isTimeBuffered(time) {
+	// Check if the given time is within any buffered time range
+	for (let i = 0; i < audio.buffered.length; i++) {
+		if (time >= audio.buffered.start(i) && time <= audio.buffered.end(i)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+function attemptSeekWithRetry(seekTime, targetPercentage) {
+	targetSeekTime = seekTime;
+	isSeeking = true;
+
+	// Lock the progress bar at the target position
+	progressBar.style.setProperty('--progress', targetPercentage * 100);
+
+	const wasPlaying = !audio.paused;
+
+	// Try to seek
+	audio.currentTime = seekTime;
+
+	// Handler to check if we reached the target after seeking completes
+	function checkSeekSuccess() {
+		// Allow small tolerance for floating point comparison
+		if (Math.abs(audio.currentTime - targetSeekTime) > 0.5) {
+			// Browser clamped to buffered range - need to wait for more data
+			// Now pause and show seeking status
+			if (wasPlaying) {
+				audio.pause();
+			}
+			const song = songs[currentSongIndex];
+			updateCurrentSongDisplay(`Seeking: ${song.artist} - ${song.title}`);
+			continueSeekingToTarget(wasPlaying);
+		} else {
+			// Successfully reached target immediately (was already buffered)
+			isSeeking = false;
+			targetSeekTime = null;
+			// No need to update display - the seek was instant and playback continues normally
+		}
+	}
+
+	audio.addEventListener('seeked', checkSeekSuccess, { once: true });
+}
+
+function continueSeekingToTarget(wasPlaying) {
+	const song = songs[currentSongIndex];
+
+	// Keep showing seeking status
+	updateCurrentSongDisplay(`Seeking: ${song.artist} - ${song.title}`);
+
+	// Handler for when more data loads
+	function retrySeek() {
+		if (!isSeeking || targetSeekTime === null) {
+			return; // Seeking was cancelled
+		}
+
+		audio.currentTime = targetSeekTime;
+
+		// Check again after this seek completes
+		function checkAgain() {
+			if (!isSeeking || targetSeekTime === null) {
+				return;
+			}
+
+			if (Math.abs(audio.currentTime - targetSeekTime) > 0.5) {
+				// Still not there, keep trying
+				continueSeekingToTarget(wasPlaying);
+			} else {
+				// Success!
+				isSeeking = false;
+				targetSeekTime = null;
+
+				if (wasPlaying) {
+					audio.play();
+				} else {
+					updateCurrentSongDisplay(`Paused: ${song.artist} - ${song.title}`);
+				}
+			}
+		}
+
+		audio.addEventListener('seeked', checkAgain, { once: true });
+	}
+
+	// Wait for more data to load, then try again
+	audio.addEventListener('progress', retrySeek, { once: true });
+
+	// Also set a timeout fallback in case progress doesn't fire
+	setTimeout(() => {
+		if (isSeeking && targetSeekTime !== null && Math.abs(audio.currentTime - targetSeekTime) > 0.5) {
+			retrySeek();
+		}
+	}, 1000);
 }
 
 function onProgressMouseDown(event) {
