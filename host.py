@@ -57,10 +57,18 @@ def main():
 	# Create server
 	Handler = http.server.SimpleHTTPRequestHandler
 
-	# Suppress default logging
+	# Suppress default logging and broken pipe errors
 	class QuietHandler(Handler):
 		def log_message(self, format, *args):
 			pass
+
+		def handle(self):
+			"""Handle requests and suppress broken pipe errors"""
+			try:
+				super().handle()
+			except (BrokenPipeError, ConnectionResetError):
+				# Browser cancelled the request (normal for media streaming/preloading)
+				pass
 
 	try:
 		with socketserver.TCPServer(("", port), QuietHandler) as httpd:

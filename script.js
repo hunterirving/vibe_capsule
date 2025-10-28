@@ -14,6 +14,10 @@ let playerReady = false;
 let songs = [];
 let animationFrameId = null;
 let prePlaySeekTime = 0;
+let preloadedAudio = {}; // Cache for preloaded audio elements
+let currentPreloadIndex = 0;
+let priorityPreloadQueue = []; // Songs requested by user that need priority preloading
+let isPreloadingPriority = false;
 
 // Load tracks from tracks.json
 fetch('tracks.json')
@@ -29,6 +33,10 @@ fetch('tracks.json')
 			playerReady = true;
 			updateCurrentSongDisplay(`Ready to play: ${songs[0].artist} - ${songs[0].title}`);
 			renderPlaylist();
+			// Pre-cache resources first, then songs
+			preloadResources().then(() => {
+				startPreloadingSongs();
+			});
 		} else {
 			updateCurrentSongDisplay('No tracks found');
 		}
@@ -162,7 +170,16 @@ function playSong(index) {
 
 	currentSongIndex = index;
 	const song = songs[currentSongIndex];
-	audio.src = `tracks/${song.filename}`;
+
+	// Use preloaded blob if available, otherwise load from server
+	if (preloadedAudio[song.filename]) {
+		audio.src = preloadedAudio[song.filename].blobUrl;
+	} else {
+		audio.src = `tracks/${song.filename}`;
+		// Request priority preloading for this song
+		requestPriorityPreload(song.filename);
+	}
+
 	audio.play();
 	isPlaying = true;
 	updatePlayPauseButton();
@@ -268,7 +285,13 @@ function applySeek(clickPercentage) {
 	// If audio hasn't been loaded yet, load it but don't play
 	if (!audio.src || audio.src === '') {
 		const song = songs[currentSongIndex];
-		audio.src = `tracks/${song.filename}`;
+
+		// Use preloaded blob if available, otherwise load from server
+		if (preloadedAudio[song.filename]) {
+			audio.src = preloadedAudio[song.filename].blobUrl;
+		} else {
+			audio.src = `tracks/${song.filename}`;
+		}
 
 		// Wait for metadata to be loaded before seeking
 		audio.addEventListener('loadedmetadata', function setInitialTime() {
@@ -472,3 +495,246 @@ navigator.mediaSession.setActionHandler('nexttrack', () => {
 		nextSong();
 	}
 });
+
+// Pre-caching system
+function preloadResources() {
+	console.log('Preloading UI resources...');
+
+	const resources = [
+		'resources/play.png',
+		'resources/pause.png',
+		'resources/prev.png',
+		'resources/next.png'
+	];
+
+	const imagePromises = resources.map(src => {
+		return new Promise((resolve, reject) => {
+			const img = new Image();
+			img.onload = () => {
+				console.log(`Preloaded: ${src}`);
+				resolve();
+			};
+			img.onerror = () => {
+				console.error(`Failed to preload: ${src}`);
+				resolve(); // Resolve anyway to not block other resources
+			};
+			img.src = src;
+		});
+	});
+
+	return Promise.all(imagePromises).then(() => {
+		console.log('All UI resources preloaded');
+	});
+}
+
+function startPreloadingSongs() {
+	// Start with the first song
+	currentPreloadIndex = 0;
+	preloadNextSong();
+}
+
+function preloadNextSong() {
+	if (currentPreloadIndex >= songs.length) {
+		console.log('All songs preloaded');
+		return;
+	}
+
+	const song = songs[currentPreloadIndex];
+	const filename = song.filename;
+
+	// Skip if already preloaded
+	if (preloadedAudio[filename]) {
+		currentPreloadIndex++;
+		preloadNextSong();
+		return;
+	}
+
+	console.log(`Preloading: ${song.artist} - ${song.title}`);
+
+	// Use fetch to force full download of the entire file
+	fetch(`tracks/${filename}`)
+		.then(response => {
+			if (!response.ok) {
+				throw new Error(`HTTP error! status: ${response.status}`);
+			}
+			// Get total file size for progress tracking
+			const contentLength = response.headers.get('content-length');
+			console.log(`Downloading ${song.title} (${(contentLength / 1024 / 1024).toFixed(2)} MB)...`);
+
+			// Read the entire response as a blob
+			return response.blob();
+		})
+		.then(blob => {
+			// Create a blob URL that will persist in memory
+			const blobUrl = URL.createObjectURL(blob);
+
+			// Create audio element with the fully downloaded blob
+			const preloadAudio = new Audio();
+			preloadAudio.preload = 'auto';
+			preloadAudio.src = blobUrl;
+
+			// Wait for the audio element to fully buffer the blob
+			return new Promise((resolve) => {
+				const checkBuffered = () => {
+					// Check if the entire duration is buffered
+					if (preloadAudio.duration > 0 && preloadAudio.buffered.length > 0) {
+						const bufferedEnd = preloadAudio.buffered.end(preloadAudio.buffered.length - 1);
+						if (bufferedEnd >= preloadAudio.duration - 0.1) {
+							// Fully buffered!
+							resolve({ preloadAudio, blobUrl, blob });
+							return;
+						}
+					}
+					// Not fully buffered yet, check again soon
+					setTimeout(checkBuffered, 100);
+				};
+
+				// Start checking once metadata is loaded
+				preloadAudio.addEventListener('loadedmetadata', () => {
+					checkBuffered();
+				}, { once: true });
+
+				// Trigger the loading
+				preloadAudio.load();
+			});
+		})
+		.then(({ preloadAudio, blobUrl, blob }) => {
+			// Store both the audio element and blob URL
+			preloadedAudio[filename] = {
+				audio: preloadAudio,
+				blobUrl: blobUrl,
+				blob: blob
+			};
+
+			console.log(`✓ Fully preloaded: ${song.artist} - ${song.title}`);
+
+			// Move to next song
+			currentPreloadIndex++;
+			setTimeout(() => preloadNextSong(), 100);
+		})
+		.catch(error => {
+			console.error(`Failed to preload ${filename}:`, error);
+			currentPreloadIndex++;
+			preloadNextSong();
+		});
+}
+
+// Priority preloading system
+function requestPriorityPreload(filename) {
+	// Skip if already preloaded or already in priority queue
+	if (preloadedAudio[filename] || priorityPreloadQueue.includes(filename)) {
+		return;
+	}
+
+	console.log(`🔥 Priority preload requested: ${filename}`);
+	priorityPreloadQueue.push(filename);
+
+	// Start priority preloading if not already running
+	if (!isPreloadingPriority) {
+		processPriorityPreload();
+	}
+}
+
+function processPriorityPreload() {
+	if (priorityPreloadQueue.length === 0) {
+		isPreloadingPriority = false;
+		return;
+	}
+
+	isPreloadingPriority = true;
+	const filename = priorityPreloadQueue.shift();
+
+	// Check if already preloaded (might have finished during normal preloading)
+	if (preloadedAudio[filename]) {
+		processPriorityPreload();
+		return;
+	}
+
+	// Find the song info
+	const song = songs.find(s => s.filename === filename);
+	if (!song) {
+		processPriorityPreload();
+		return;
+	}
+
+	console.log(`🔥 Priority preloading: ${song.artist} - ${song.title}`);
+
+	// Use fetch to force full download of the entire file
+	fetch(`tracks/${filename}`)
+		.then(response => {
+			if (!response.ok) {
+				throw new Error(`HTTP error! status: ${response.status}`);
+			}
+			return response.blob();
+		})
+		.then(blob => {
+			// Create a blob URL that will persist in memory
+			const blobUrl = URL.createObjectURL(blob);
+
+			// Create audio element with the fully downloaded blob
+			const preloadAudio = new Audio();
+			preloadAudio.preload = 'auto';
+			preloadAudio.src = blobUrl;
+
+			// Wait for the audio element to fully buffer the blob
+			return new Promise((resolve) => {
+				const checkBuffered = () => {
+					// Check if the entire duration is buffered
+					if (preloadAudio.duration > 0 && preloadAudio.buffered.length > 0) {
+						const bufferedEnd = preloadAudio.buffered.end(preloadAudio.buffered.length - 1);
+						if (bufferedEnd >= preloadAudio.duration - 0.1) {
+							// Fully buffered!
+							resolve({ preloadAudio, blobUrl, blob });
+							return;
+						}
+					}
+					// Not fully buffered yet, check again soon
+					setTimeout(checkBuffered, 100);
+				};
+
+				// Start checking once metadata is loaded
+				preloadAudio.addEventListener('loadedmetadata', () => {
+					checkBuffered();
+				}, { once: true });
+
+				// Trigger the loading
+				preloadAudio.load();
+			});
+		})
+		.then(({ preloadAudio, blobUrl, blob }) => {
+			// Store both the audio element and blob URL
+			preloadedAudio[filename] = {
+				audio: preloadAudio,
+				blobUrl: blobUrl,
+				blob: blob
+			};
+
+			// Switch to the preloaded version if this is the current song
+			if (songs[currentSongIndex].filename === filename && audio.src !== blobUrl) {
+				const currentTime = audio.currentTime;
+				const wasPlaying = !audio.paused;
+				audio.src = blobUrl;
+				audio.currentTime = currentTime;
+				if (wasPlaying) {
+					audio.play().catch(err => {
+						// Ignore play interruption errors (expected during source switching)
+						if (err.name !== 'AbortError') {
+							console.error('Error resuming playback:', err);
+						}
+					});
+				}
+			}
+
+			// Process next priority request
+			processPriorityPreload();
+		})
+		.catch(error => {
+			// Ignore abort errors (happens when normal preload finishes first)
+			if (error.name === 'AbortError' || error.message.includes('aborted')) {
+				// This is expected - normal preloading probably finished first
+			} else {
+				console.error(`Failed to priority preload ${filename}:`, error);
+			}
+			processPriorityPreload();
+		});
+}
