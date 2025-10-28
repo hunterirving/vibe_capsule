@@ -1,13 +1,14 @@
 :root {
-	--icee: #dddddd;
-	--blueberry: #4c7ae6;
-	--bubblegum: #f421ff;
-	--asphalt: #080a0c;
-	--fog: #ddddddcc;
+	--text: #dddddd;
+	--dimmed-text: #ddddddcc;
+	--primary: #4c7ae6;
+	--accent: #f421ff;
+	--background: #080a0c;
 }
 
 * {
-	scrollbar-color: var(--fog) var(--asphalt);
+	scrollbar-color: var(--dimmed-text) var(--background);
+	user-select: none;
 }
 
 body {
@@ -18,7 +19,7 @@ body {
 	display: flex;
 	flex-direction: column;
 	font-size: 24px;
-	background-color: var(--asphalt);
+	background-color: var(--background);
 }
 
 .window-container {
@@ -52,6 +53,28 @@ body {
 	z-index: 3;
 }
 
+.control-button {
+	width: 120px;
+	height: 45px;
+	background-size: contain;
+	background-repeat: no-repeat;
+	background-position: center;
+	border: none;
+	cursor: pointer;
+	margin: 0 7px;
+	border-radius: 50%;
+	background-color: var(--text);
+	box-shadow:
+		inset -2px -2px 4px rgba(0, 0, 0, 0.3),
+		inset 2px 2px 4px rgba(255, 255, 255, 0.4),
+		0 2px 4px rgba(0, 0, 0, 0.5),
+		0 4px 8px rgba(0, 0, 0, 0.3);
+	filter:
+		drop-shadow(0 0 1px rgba(0, 0, 0, 0.8))
+		drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.6))
+		drop-shadow(-0.5px -0.5px 0 rgba(255, 255, 255, 0.2));
+}
+
 .playlist-wrapper {
 	flex-grow: 1;
 	position: relative;
@@ -68,12 +91,11 @@ body {
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	color: var(--icee);
+	color: var(--text);
 	min-height: 45px;
 	padding-left: 15px;
 	padding-right: 10px;
-	padding-top: 9px;
-	padding-bottom: 9px;
+	padding-bottom: 18px;
 }
 
 .playlist-item-content {
@@ -90,33 +112,33 @@ body {
 
 .playlist-item-title.current {
 	font-weight: bold;
-	color: var(--blueberry);
+	color: var(--primary);
 }
 
 .playlist-item-artist {
 	font-size: 16px;
-	color: var(--fog);
+	color: var(--dimmed-text);
 	line-height: 1.2;
 }
 
 .playlist-item-artist.current {
 	font-weight: bold;
-	color: var(--blueberry);
+	color: var(--primary);
 	opacity: 1;
 }
 
 .playlist-item:hover {
 	cursor: pointer;
-	color: var(--bubblegum);
+	color: var(--accent);
 }
 
 .playlist-item:hover .playlist-item-artist {
-	color: var(--bubblegum);
+	color: var(--accent);
 }
 
 .playlist-item:hover .playlist-item-title.current,
 .playlist-item:hover .playlist-item-artist.current {
-	color: var(--bubblegum);
+	color: var(--accent);
 }
 
 .current-song {
@@ -124,11 +146,11 @@ body {
 	padding-left: 15px;
 	padding-bottom: 10px;
 	font-weight: bold;
-	color: var(--blueberry);
+	color: var(--primary);
 	min-height: 35px;
 	display: flex;
 	align-items: center;
-	background-color: var(--asphalt);
+	background-color: var(--background);
 	z-index: 2;
 	position: relative;
 }
@@ -152,10 +174,10 @@ body {
 	display: flex;
 	align-items: center;
 	padding: 0 15px;
-	padding-bottom: 6px;
+	padding-bottom: 7px;
 	box-sizing: border-box;
 	position: relative;
-	background-color: var(--asphalt);
+	background-color: var(--background);
 	z-index: 2;
 }
 
@@ -183,7 +205,7 @@ body {
 .progress-bar {
 	width: 100%;
 	height: 4px;
-	background-color: var(--icee);
+	background-color: var(--text);
 	position: relative;
 	border-radius: 1px;
 	--progress: 0%;
@@ -197,7 +219,7 @@ body {
 	top: 0;
 	height: 100%;
 	width: var(--progress);
-	background-color: var(--bubblegum);
+	background-color: var(--accent);
 	border-radius: 1px;
 	transition: none;
 }
@@ -210,7 +232,7 @@ body {
 	transform: translateY(-50%);
 	width: var(--circle-size);
 	height: var(--circle-size);
-	background-color: var(--bubblegum);
+	background-color: var(--accent);
 	border-radius: 50%;
 	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 	transition: none;
@@ -226,28 +248,6 @@ body {
 
 .progress-text-center {
 	display: none;
-}
-
-.control-button {
-	width: 120px;
-	height: 45px;
-	background-size: contain;
-	background-repeat: no-repeat;
-	background-position: center;
-	border: none;
-	cursor: pointer;
-	margin: 0 5px;
-	border-radius: 50%;
-	background-color: var(--icee);
-	box-shadow:
-		inset -2px -2px 4px rgba(0, 0, 0, 0.3),
-		inset 2px 2px 4px rgba(255, 255, 255, 0.4),
-		0 2px 4px rgba(0, 0, 0, 0.5),
-		0 4px 8px rgba(0, 0, 0, 0.3);
-	filter:
-		drop-shadow(0 0 1px rgba(0, 0, 0, 0.8))
-		drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.6))
-		drop-shadow(-0.5px -0.5px 0 rgba(255, 255, 255, 0.2));
 }
 
 #playPause {
