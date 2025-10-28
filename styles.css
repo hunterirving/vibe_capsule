@@ -72,8 +72,8 @@ body {
 	min-height: 45px;
 	padding-left: 15px;
 	padding-right: 10px;
-	padding-top: 8px;
-	padding-bottom: 8px;
+	padding-top: 9px;
+	padding-bottom: 9px;
 }
 
 .playlist-item-content {
@@ -230,7 +230,7 @@ body {
 
 .control-button {
 	width: 120px;
-	height: 42px;
+	height: 45px;
 	background-size: contain;
 	background-repeat: no-repeat;
 	background-position: center;
@@ -238,14 +238,21 @@ body {
 	cursor: pointer;
 	margin: 0 5px;
 	border-radius: 50%;
+	background-color: var(--icee);
+	box-shadow:
+		inset -2px -2px 4px rgba(0, 0, 0, 0.3),
+		inset 2px 2px 4px rgba(255, 255, 255, 0.4),
+		0 2px 4px rgba(0, 0, 0, 0.5),
+		0 4px 8px rgba(0, 0, 0, 0.3);
 	filter:
-		drop-shadow(0 1px 2px rgba(0, 0, 0, 0.9))
-		drop-shadow(0 3px 6px rgba(0, 0, 0, 0.6));
+		drop-shadow(0 0 1px rgba(0, 0, 0, 0.8))
+		drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.6))
+		drop-shadow(-0.5px -0.5px 0 rgba(255, 255, 255, 0.2));
 }
 
 #playPause {
 	background-image: url('resources/play.png');
-	background-position: 53% center;
+	background-position: 52.5% center;
 }
 
 #playPause.pause {
@@ -255,10 +262,10 @@ body {
 
 #prev {
 	background-image: url('resources/prev.png');
-	background-position: 44% center;
+	background-position: 45% center;
 }
 
 #next {
 	background-image: url('resources/next.png');
-	background-position: 56% center;
+	background-position: 55% center;
 }
