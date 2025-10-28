@@ -34,7 +34,6 @@ body {
 	flex-direction: column;
 	overflow: hidden;
 	position: relative;
-	padding-left: 10px;
 	padding-top: 10px;
 }
 
@@ -66,12 +65,15 @@ body {
 }
 
 .playlist-item {
-	padding: 5px 10px;
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
 	color: var(--icee);
 	min-height: 45px;
+	padding-left: 15px;
+	padding-right: 10px;
+	padding-top: 8px;
+	padding-bottom: 8px;
 }
 
 .playlist-item-content {
@@ -104,23 +106,22 @@ body {
 }
 
 .playlist-item:hover {
-	background-color: var(--bubblegum);
 	cursor: pointer;
-	color: var(--asphalt);
+	color: var(--bubblegum);
 }
 
 .playlist-item:hover .playlist-item-artist {
-	color: var(--asphalt);
+	color: var(--bubblegum);
 }
 
 .playlist-item:hover .playlist-item-title.current,
 .playlist-item:hover .playlist-item-artist.current {
-	color: var(--asphalt);
+	color: var(--bubblegum);
 }
 
 .current-song {
 	text-align: left;
-	padding-left: 10px;
+	padding-left: 15px;
 	padding-bottom: 10px;
 	font-weight: bold;
 	color: var(--blueberry);
@@ -150,7 +151,7 @@ body {
 	height: 35px;
 	display: flex;
 	align-items: center;
-	padding: 0 12px;
+	padding: 0 15px;
 	padding-bottom: 6px;
 	box-sizing: border-box;
 	position: relative;
@@ -236,7 +237,7 @@ body {
 	border: none;
 	cursor: pointer;
 	margin: 0 5px;
-	border-radius: 4px;
+	border-radius: 50%;
 	filter:
 		drop-shadow(0 1px 2px rgba(0, 0, 0, 0.9))
 		drop-shadow(0 3px 6px rgba(0, 0, 0, 0.6));
