@@ -10,8 +10,12 @@
 			--icee: #dddddd;
 			--blueberry: #4c7ae6;
 			--bubblegum: #f421ff;
-			--blush: #bf209c;
 			--asphalt: #080a0c;
+			--fog: #ddddddcc;
+		}
+
+		* {
+			scrollbar-color: var(--fog) var(--asphalt);
 		}
 
 		body {
@@ -89,7 +93,7 @@
 
 		.playlist-item-artist {
 			font-size: 16px;
-			opacity: 0.8;
+			color: var(--fog);
 			line-height: 1.2;
 		}
 
@@ -106,7 +110,7 @@
 		}
 
 		.playlist-item:hover .playlist-item-artist {
-			opacity: 1;
+			color: var(--asphalt);
 		}
 
 		.playlist-item:hover .playlist-item-title.current,
