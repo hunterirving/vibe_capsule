@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎧</text></svg>">
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>vibe capsule</title>
+	<style>
+		:root {
+			--icee: #dddddd;
+			--blueberry: #4c7ae6;
+			--bubblegum: #f421ff;
+			--blush: #bf209c;
+			--asphalt: #080a0c;
+		}
+
+		body {
+			margin: 0;
+			padding: 0;
+			font-family: "MS Sans Serif", Arial, sans-serif;
+			height: 100vh;
+			display: flex;
+			flex-direction: column;
+			font-size: 24px;
+			background-color: var(--asphalt);
+		}
+
+		.window-container {
+			background: transparent;
+			height: 100%;
+			display: flex;
+			flex-direction: column;
+		}
+
+		.player-container {
+			flex-grow: 1;
+			display: flex;
+			flex-direction: column;
+			overflow: hidden;
+			position: relative;
+		}
+
+		.controls {
+			display: flex;
+			justify-content: center;
+			padding-bottom: 10px;
+			height: 52px;
+			background: transparent;
+			position: absolute;
+			bottom: 0;
+			left: 0;
+			right: 0;
+			box-sizing: border-box;
+			z-index: 3;
+		}
+
+		.playlist {
+			flex-grow: 1;
+			overflow-y: auto;
+			padding-bottom: 62px;
+			cursor: initial;
+		}
+
+		.playlist-item {
+			padding: 5px 10px;
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			color: var(--icee);
+			min-height: 45px;
+		}
+
+		.playlist-item-content {
+			flex-grow: 1;
+			display: flex;
+			flex-direction: column;
+			gap: 2px;
+		}
+
+		.playlist-item-title {
+			font-size: 20px;
+			line-height: 1.2;
+		}
+
+		.playlist-item-title.current {
+			font-weight: bold;
+			color: var(--blueberry);
+		}
+
+		.playlist-item-artist {
+			font-size: 16px;
+			opacity: 0.8;
+			line-height: 1.2;
+		}
+
+		.playlist-item-artist.current {
+			font-weight: bold;
+			color: var(--blueberry);
+			opacity: 1;
+		}
+
+		.playlist-item:hover {
+			background-color: var(--bubblegum);
+			cursor: pointer;
+			color: var(--asphalt);
+		}
+
+		.playlist-item:hover .playlist-item-title.current,
+		.playlist-item:hover .playlist-item-artist.current {
+			color: var(--asphalt);
+		}
+
+		.current-song {
+			text-align: left;
+			padding-left: 10px;
+			font-weight: bold;
+			color: var(--blueberry);
+			min-height: 35px;
+			display: flex;
+			align-items: center;
+		}
+
+		.current-song span {
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
+
+		#audioPlayer {
+			display: none;
+		}
+
+		.progress-container {
+			width: 100%;
+			font-size: 24px;
+			background-color: var(--icee);
+			cursor: pointer;
+			margin-top: 3px;
+			height: 35px;
+		}
+
+		.progress-container:hover {
+			cursor: pointer;
+		}
+
+		.progress-bar {
+			width: 0%;
+			height: 34px;
+			background-color: var(--bubblegum);
+			border-bottom: 1px solid var(--blush);
+			position: relative;
+		}
+
+		.progress-text {
+			text-shadow: 1px 1px 1px var(--asphalt);
+		}
+
+		.progress-text-left {
+			position: absolute;
+			left: 5px;
+			top: 50%;
+			transform: translateY(-50%);
+			color: var(--icee);
+		}
+
+		.progress-text-center {
+			position: absolute;
+			left: 50%;
+			top: 50%;
+			transform: translate(-50%, -50%);
+			color: var(--icee);
+			opacity: 0;
+		}
+
+		.control-button {
+			width: 120px;
+			height: 42px;
+			background-size: contain;
+			background-repeat: no-repeat;
+			background-position: center;
+			border: none;
+			cursor: pointer;
+			margin: 0 5px;
+			border-radius: 4px;
+		}
+
+		#playPause {
+			background-image: url('resources/play.png');
+		}
+
+		#playPause.pause {
+			background-image: url('resources/pause.png');
+		}
+
+		#prev {
+			background-image: url('resources/prev.png');
+		}
+
+		#next {
+			background-image: url('resources/next.png');
+		}
+	</style>
+
+</head>
+<body>
+	<div class="window-container">
+		<div class="player-container">
+			<div class="current-song" id="currentSong">No song playing</div>
+			<div class="progress-container" id="progressContainer">
+				<div class="progress-bar" id="progressBar">
+					<span class="progress-text progress-text-left" id="progressTextLeft"></span>
+					<span class="progress-text progress-text-center" id="progressTextCenter"></span>
+				</div>
+			</div>
+			<div class="playlist" id="playlist"></div>
+		</div>
+		<div class="controls">
+			<button class="control-button" id="prev"></button>
+			<button class="control-button" id="playPause"></button>
+			<button class="control-button" id="next"></button>
+		</div>
+	</div>
+
+	<audio id="audioPlayer"></audio>
+
+	<script>
+		const playPauseBtn = document.getElementById('playPause');
+		const prevBtn = document.getElementById('prev');
+		const nextBtn = document.getElementById('next');
+		const playlist = document.getElementById('playlist');
+		const currentSongDisplay = document.getElementById('currentSong');
+		const progressBar = document.getElementById('progressBar');
+		const progressContainer = document.getElementById('progressContainer');
+		const audio = document.getElementById('audioPlayer');
+
+		let currentSongIndex = 0;
+		let isPlaying = false;
+		let progressInterval;
+		let playerReady = false;
+		let songs = [];
+
+		// Load tracks from tracks.json
+		fetch('tracks.json')
+			.then(response => {
+				if (!response.ok) {
+					throw new Error('tracks.json not found');
+				}
+				return response.json();
+			})
+			.then(data => {
+				songs = data;
+				if (songs.length > 0) {
+					playerReady = true;
+					updateCurrentSongDisplay(`Ready to play: ${songs[0].artist} - ${songs[0].title}`);
+					renderPlaylist();
+				} else {
+					updateCurrentSongDisplay('No tracks found');
+				}
+			})
+			.catch(error => {
+				console.error('Error loading tracks:', error);
+				updateCurrentSongDisplay('Error: tracks.json not found. Run scan.py first.');
+			});
+
+		// Audio event listeners
+		audio.addEventListener('play', () => {
+			startProgressBar();
+			const song = songs[currentSongIndex];
+			updateCurrentSongDisplay(song.looping ?
+				`Looping: ${song.artist} - ${song.title}` :
+				`Now playing: ${song.artist} - ${song.title}`);
+
+			// Update media session metadata
+			if ('mediaSession' in navigator) {
+				navigator.mediaSession.metadata = new MediaMetadata({
+					title: song.title,
+					artist: song.artist
+				});
+			}
+		});
+
+		audio.addEventListener('pause', () => {
+			stopProgressBar();
+			const song = songs[currentSongIndex];
+			updateCurrentSongDisplay(`Paused: ${song.artist} - ${song.title}`);
+		});
+
+		audio.addEventListener('ended', () => {
+			if (songs[currentSongIndex].looping) {
+				audio.currentTime = 0;
+				audio.play();
+			} else {
+				nextSong();
+			}
+		});
+
+		audio.addEventListener('error', (e) => {
+			console.error('Audio error:', e);
+			updateCurrentSongDisplay(`Error loading: ${songs[currentSongIndex].filename}`);
+			// Try next song after a brief delay
+			setTimeout(() => nextSong(), 1000);
+		});
+
+		audio.addEventListener('loadedmetadata', () => {
+			resetProgressBar();
+		});
+
+		function renderPlaylist() {
+			playlist.innerHTML = '';
+			const currentDisplayText = currentSongDisplay.textContent;
+			const isInitialized = currentDisplayText !== 'No song playing';
+
+			songs.forEach((song, index) => {
+				const item = document.createElement('div');
+				item.classList.add('playlist-item');
+
+				const contentDiv = document.createElement('div');
+				contentDiv.classList.add('playlist-item-content');
+
+				const titleDiv = document.createElement('div');
+				titleDiv.classList.add('playlist-item-title');
+				if (isInitialized && index === currentSongIndex) {
+					titleDiv.classList.add('current');
+				}
+				titleDiv.textContent = song.title;
+
+				const artistDiv = document.createElement('div');
+				artistDiv.classList.add('playlist-item-artist');
+				if (isInitialized && index === currentSongIndex) {
+					artistDiv.classList.add('current');
+				}
+				artistDiv.textContent = song.artist;
+
+				contentDiv.appendChild(titleDiv);
+				contentDiv.appendChild(artistDiv);
+
+				const loopIcon = document.createElement('span');
+				loopIcon.textContent = '🔁';
+				loopIcon.style.display = (song.looping || false) ? 'inline' : 'none';
+
+				item.appendChild(contentDiv);
+				item.appendChild(loopIcon);
+				item.addEventListener('click', () => toggleLooping(index));
+				playlist.appendChild(item);
+			});
+		}
+
+		function toggleLooping(index) {
+			if (!playerReady) return;
+			if (index === currentSongIndex) {
+				// If it's ready to play but not playing yet, just play it
+				if (!isPlaying && currentSongDisplay.textContent.includes('Ready to play')) {
+					audio.play();
+					isPlaying = true;
+					updatePlayPauseButton();
+					return;
+				}
+				// Toggle looping
+				songs[index].looping = !(songs[index].looping || false);
+				renderPlaylist();
+
+				const song = songs[index];
+				// Update the display text based on current state
+				if (isPlaying) {
+					updateCurrentSongDisplay(song.looping ?
+						`Looping: ${song.artist} - ${song.title}` :
+						`Now playing: ${song.artist} - ${song.title}`);
+				} else {
+					updateCurrentSongDisplay(`Paused: ${song.artist} - ${song.title}`);
+				}
+			} else {
+				playSong(index);
+			}
+		}
+
+		function playSong(index) {
+			if (!playerReady) return;
+			// Clear looping from all songs except the new one if it was already looping
+			const wasLooping = songs[index].looping || false;
+			songs.forEach(song => song.looping = false);
+			if (wasLooping) {
+				songs[index].looping = true;
+			}
+
+			currentSongIndex = index;
+			const song = songs[currentSongIndex];
+			audio.src = `tracks/${song.filename}`;
+			audio.play();
+			isPlaying = true;
+			updatePlayPauseButton();
+			renderPlaylist();
+		}
+
+		function updateCurrentSongDisplay(text) {
+			currentSongDisplay.innerHTML = `<span>${text}</span>`;
+		}
+
+		function togglePlayPause() {
+			if (!playerReady) return;
+			if (isPlaying) {
+				audio.pause();
+				isPlaying = false;
+			} else {
+				// If no song is loaded, load the first one
+				if (!audio.src || audio.src === '') {
+					playSong(currentSongIndex);
+				} else {
+					audio.play();
+					isPlaying = true;
+				}
+			}
+			updatePlayPauseButton();
+		}
+
+		function updatePlayPauseButton() {
+			playPauseBtn.classList.toggle('pause', isPlaying);
+		}
+
+		function nextSong() {
+			if (!playerReady) return;
+			currentSongIndex = (currentSongIndex + 1) % songs.length;
+			playSong(currentSongIndex);
+		}
+
+		function prevSong() {
+			if (!playerReady) return;
+			if (audio.currentTime <= 3) {
+				currentSongIndex = (currentSongIndex - 1 + songs.length) % songs.length;
+				playSong(currentSongIndex);
+			} else {
+				audio.currentTime = 0;
+			}
+		}
+
+		function startProgressBar() {
+			stopProgressBar();
+			progressInterval = setInterval(updateProgressBar, 100);
+		}
+
+		function stopProgressBar() {
+			clearInterval(progressInterval);
+		}
+
+		function resetProgressBar() {
+			progressBar.style.width = '0%';
+			const progressTextLeft = document.getElementById('progressTextLeft');
+			const progressTextCenter = document.getElementById('progressTextCenter');
+			progressTextLeft.textContent = '0%';
+			progressTextCenter.textContent = '0%';
+			progressTextLeft.style.opacity = '1';
+			progressTextCenter.style.opacity = '0';
+		}
+
+		function updateProgressBar() {
+			if (audio.duration) {
+				const currentTime = audio.currentTime;
+				const duration = audio.duration;
+				const progressPercentage = (currentTime / duration) * 100;
+				const displayPercentage = isNaN(progressPercentage) ? 0 : Math.round(progressPercentage);
+				const percentageText = `${displayPercentage}%`;
+
+				progressBar.style.width = `${displayPercentage}%`;
+
+				const progressTextLeft = document.getElementById('progressTextLeft');
+				const progressTextCenter = document.getElementById('progressTextCenter');
+
+				progressTextLeft.textContent = percentageText;
+				progressTextCenter.textContent = percentageText;
+
+				// Get the width of the text
+				const textWidth = progressTextCenter.offsetWidth;
+				const barWidth = progressBar.offsetWidth;
+
+				// Show centered text only when there's room
+				if (barWidth >= textWidth + 20) {
+					progressTextLeft.style.opacity = '0';
+					progressTextCenter.style.opacity = '1';
+				} else {
+					progressTextLeft.style.opacity = '1';
+					progressTextCenter.style.opacity = '0';
+				}
+			}
+		}
+
+		function seekTo(event) {
+			if (!playerReady || !audio.duration) return;
+			const rect = progressContainer.getBoundingClientRect();
+			const clickPosition = event.clientX - rect.left;
+			const clickPercentage = clickPosition / rect.width;
+			const duration = audio.duration;
+			const seekTime = duration * clickPercentage;
+			audio.currentTime = seekTime;
+		}
+
+		playPauseBtn.addEventListener('click', togglePlayPause);
+		nextBtn.addEventListener('click', nextSong);
+		prevBtn.addEventListener('click', prevSong);
+		progressContainer.addEventListener('click', seekTo);
+
+		// Keyboard controls
+		document.addEventListener('keydown', function(event) {
+			if (!playerReady) return;
+
+			// Spacebar: play/pause
+			if (event.code === 'Space') {
+				event.preventDefault();
+				togglePlayPause();
+			}
+		});
+
+		// Media key controls
+		navigator.mediaSession.metadata = new MediaMetadata({
+			title: 'vibe capsule',
+			artist: 'MP3 Player'
+		});
+
+		navigator.mediaSession.setActionHandler('play', () => {
+			if (playerReady && !isPlaying) {
+				togglePlayPause();
+			}
+		});
+
+		navigator.mediaSession.setActionHandler('pause', () => {
+			if (playerReady && isPlaying) {
+				togglePlayPause();
+			}
+		});
+
+		navigator.mediaSession.setActionHandler('previoustrack', () => {
+			if (playerReady) {
+				prevSong();
+			}
+		});
+
+		navigator.mediaSession.setActionHandler('nexttrack', () => {
+			if (playerReady) {
+				nextSong();
+			}
+		});
+	</script>
+</body>
+</html>
