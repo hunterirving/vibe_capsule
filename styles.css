@@ -96,6 +96,7 @@ body {
 	overflow-y: auto;
 	padding-bottom: 60px;
 	overscroll-behavior: none;
+	margin-top: -1px;
 }
 
 .playlist {
@@ -143,18 +144,20 @@ body {
 	opacity: 1;
 }
 
-.playlist-item:hover {
-	cursor: pointer;
-	color: var(--accent);
-}
+@media (hover: hover) and (pointer: fine) {
+	.playlist-item:hover {
+		cursor: pointer;
+		color: var(--accent);
+	}
 
-.playlist-item:hover .playlist-item-artist {
-	color: var(--accent);
-}
+	.playlist-item:hover .playlist-item-artist {
+		color: var(--accent);
+	}
 
-.playlist-item:hover .playlist-item-title.current,
-.playlist-item:hover .playlist-item-artist.current {
-	color: var(--accent);
+	.playlist-item:hover .playlist-item-title.current,
+	.playlist-item:hover .playlist-item-artist.current {
+		color: var(--accent);
+	}
 }
 
 .current-song {
@@ -199,7 +202,7 @@ body {
 
 .shadow-overlay {
 	position: sticky;
-	top: 0;
+	top: -1px;
 	left: 0;
 	right: 0;
 	height: 14px;
