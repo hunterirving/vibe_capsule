@@ -117,7 +117,7 @@ body {
 	flex-grow: 1;
 	position: relative;
 	overflow-y: auto;
-	padding-bottom: 60px;
+	padding-bottom: 95px;
 	overscroll-behavior: none;
 	margin-top: -1px;
 }
