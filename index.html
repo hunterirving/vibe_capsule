@@ -105,6 +105,10 @@
 			color: var(--asphalt);
 		}
 
+		.playlist-item:hover .playlist-item-artist {
+			opacity: 1;
+		}
+
 		.playlist-item:hover .playlist-item-title.current,
 		.playlist-item:hover .playlist-item-artist.current {
 			color: var(--asphalt);
@@ -133,43 +137,66 @@
 		.progress-container {
 			width: 100%;
 			font-size: 24px;
-			background-color: var(--icee);
-			cursor: pointer;
+			cursor: grab;
 			margin-top: 3px;
 			height: 35px;
-		}
-
-		.progress-container:hover {
-			cursor: pointer;
-		}
-
-		.progress-bar {
-			width: 0%;
-			height: 34px;
-			background-color: var(--bubblegum);
-			border-bottom: 1px solid var(--blush);
+			display: flex;
+			align-items: center;
+			padding: 0 12px;
+			box-sizing: border-box;
 			position: relative;
 		}
 
+		.progress-container:hover {
+			cursor: grab;
+		}
+
+		.progress-bar {
+			width: 100%;
+			height: 4px;
+			background-color: var(--icee);
+			position: relative;
+			border-radius: 1px;
+			--progress: 0%;
+			--circle-size: 16px;
+		}
+
+		.progress-bar::before {
+			content: '';
+			position: absolute;
+			left: 0;
+			top: 0;
+			height: 100%;
+			width: var(--progress);
+			background-color: var(--bubblegum);
+			border-radius: 1px;
+			transition: none;
+		}
+
+		.progress-bar::after {
+			content: '';
+			position: absolute;
+			left: calc(var(--progress) - var(--circle-size) / 2);
+			top: 50%;
+			transform: translateY(-50%);
+			width: var(--circle-size);
+			height: var(--circle-size);
+			background-color: var(--bubblegum);
+			border-radius: 50%;
+			box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+			transition: none;
+		}
+
 		.progress-text {
-			text-shadow: 1px 1px 1px var(--asphalt);
+			display: none;
 		}
 
 		.progress-text-left {
-			position: absolute;
-			left: 5px;
-			top: 50%;
-			transform: translateY(-50%);
-			color: var(--icee);
+			display: none;
 		}
 
 		.progress-text-center {
-			position: absolute;
-			left: 50%;
-			top: 50%;
-			transform: translate(-50%, -50%);
-			color: var(--icee);
-			opacity: 0;
+			display: none;
 		}
 
 		.control-button {
@@ -238,6 +265,8 @@
 		let progressInterval;
 		let playerReady = false;
 		let songs = [];
+		let animationFrameId = null;
+		let prePlaySeekTime = 0;
 
 		// Load tracks from tracks.json
 		fetch('tracks.json')
@@ -434,68 +463,119 @@
 
 		function startProgressBar() {
 			stopProgressBar();
-			progressInterval = setInterval(updateProgressBar, 100);
+
+			function animate() {
+				updateProgressBar();
+				animationFrameId = requestAnimationFrame(animate);
+			}
+
+			animate();
 		}
 
 		function stopProgressBar() {
-			clearInterval(progressInterval);
-		}
-
-		function resetProgressBar() {
-			progressBar.style.width = '0%';
-			const progressTextLeft = document.getElementById('progressTextLeft');
-			const progressTextCenter = document.getElementById('progressTextCenter');
-			progressTextLeft.textContent = '0%';
-			progressTextCenter.textContent = '0%';
-			progressTextLeft.style.opacity = '1';
-			progressTextCenter.style.opacity = '0';
-		}
-
-		function updateProgressBar() {
-			if (audio.duration) {
-				const currentTime = audio.currentTime;
-				const duration = audio.duration;
-				const progressPercentage = (currentTime / duration) * 100;
-				const displayPercentage = isNaN(progressPercentage) ? 0 : Math.round(progressPercentage);
-				const percentageText = `${displayPercentage}%`;
-
-				progressBar.style.width = `${displayPercentage}%`;
-
-				const progressTextLeft = document.getElementById('progressTextLeft');
-				const progressTextCenter = document.getElementById('progressTextCenter');
-
-				progressTextLeft.textContent = percentageText;
-				progressTextCenter.textContent = percentageText;
-
-				// Get the width of the text
-				const textWidth = progressTextCenter.offsetWidth;
-				const barWidth = progressBar.offsetWidth;
-
-				// Show centered text only when there's room
-				if (barWidth >= textWidth + 20) {
-					progressTextLeft.style.opacity = '0';
-					progressTextCenter.style.opacity = '1';
-				} else {
-					progressTextLeft.style.opacity = '1';
-					progressTextCenter.style.opacity = '0';
-				}
+			if (animationFrameId !== null) {
+				cancelAnimationFrame(animationFrameId);
+				animationFrameId = null;
 			}
 		}
 
-		function seekTo(event) {
-			if (!playerReady || !audio.duration) return;
-			const rect = progressContainer.getBoundingClientRect();
+		function resetProgressBar() {
+			progressBar.style.setProperty('--progress', '0%');
+		}
+
+		function updateProgressBar() {
+			if (audio.duration && !isDragging) {
+				const currentTime = audio.currentTime;
+				const duration = audio.duration;
+				const progressPercentage = (currentTime / duration) * 100;
+				const displayPercentage = isNaN(progressPercentage) ? 0 : progressPercentage;
+
+				progressBar.style.setProperty('--progress', `${displayPercentage}%`);
+			}
+		}
+
+		let isDragging = false;
+		let wasPlayingBeforeDrag = false;
+		let pendingSeekPercentage = null;
+
+		function updateVisualProgress(event) {
+			if (!playerReady) return;
+
+			const rect = progressBar.getBoundingClientRect();
 			const clickPosition = event.clientX - rect.left;
-			const clickPercentage = clickPosition / rect.width;
-			const duration = audio.duration;
-			const seekTime = duration * clickPercentage;
-			audio.currentTime = seekTime;
+			const clickPercentage = Math.max(0, Math.min(1, clickPosition / rect.width));
+
+			progressBar.style.setProperty('--progress', `${clickPercentage * 100}%`);
+			return clickPercentage;
+		}
+
+		function applySeek(clickPercentage) {
+			if (!playerReady) return;
+
+			// If audio hasn't been loaded yet, load it but don't play
+			if (!audio.src || audio.src === '') {
+				const song = songs[currentSongIndex];
+				audio.src = `tracks/${song.filename}`;
+
+				// Wait for metadata to be loaded before seeking
+				audio.addEventListener('loadedmetadata', function setInitialTime() {
+					const duration = audio.duration;
+					const seekTime = duration * clickPercentage;
+					audio.currentTime = seekTime;
+					prePlaySeekTime = seekTime;
+					audio.removeEventListener('loadedmetadata', setInitialTime);
+				}, { once: true });
+			} else if (audio.duration) {
+				const duration = audio.duration;
+				const seekTime = duration * clickPercentage;
+				audio.currentTime = seekTime;
+				prePlaySeekTime = seekTime;
+			}
+		}
+
+		function onProgressMouseDown(event) {
+			if (!playerReady) return;
+			isDragging = true;
+			wasPlayingBeforeDrag = isPlaying;
+			progressContainer.style.cursor = 'grabbing';
+			document.body.style.cursor = 'grabbing';
+			pendingSeekPercentage = updateVisualProgress(event);
+			event.preventDefault();
+		}
+
+		function onProgressMouseMove(event) {
+			if (isDragging) {
+				pendingSeekPercentage = updateVisualProgress(event);
+			}
+		}
+
+		function onProgressMouseUp(event) {
+			if (isDragging) {
+				isDragging = false;
+				progressContainer.style.cursor = '';
+				document.body.style.cursor = '';
+
+				// Apply the seek now that drag is complete
+				if (pendingSeekPercentage !== null) {
+					applySeek(pendingSeekPercentage);
+					pendingSeekPercentage = null;
+				}
+
+				// If it was "Ready to play" (not playing before), start playing now
+				if (!wasPlayingBeforeDrag && !isPlaying && audio.src) {
+					audio.play();
+					isPlaying = true;
+					updatePlayPauseButton();
+				}
+			}
 		}
 
 		playPauseBtn.addEventListener('click', togglePlayPause);
 		nextBtn.addEventListener('click', nextSong);
 		prevBtn.addEventListener('click', prevSong);
-		progressContainer.addEventListener('click', seekTo);
+		progressContainer.addEventListener('mousedown', onProgressMouseDown);
+		document.addEventListener('mousemove', onProgressMouseMove);
+		document.addEventListener('mouseup', onProgressMouseUp);
 
 		// Keyboard controls
 		document.addEventListener('keydown', function(event) {
