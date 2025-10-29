@@ -6,6 +6,7 @@ const currentSongDisplay = document.getElementById('currentSong');
 const progressBar = document.getElementById('progressBar');
 const progressContainer = document.getElementById('progressContainer');
 const audio = document.getElementById('audioPlayer');
+audio.controls = true; // Enable controls for iOS media session
 
 let currentSongIndex = 0;
 let isPlaying = false;
@@ -68,10 +69,48 @@ audio.addEventListener('play', () => {
 
 	// Update media session metadata
 	if ('mediaSession' in navigator) {
+		// Convert relative path to absolute URL for media session
+		const albumArtUrl = new URL('resources/album_art.jpg', window.location.href).href;
 		navigator.mediaSession.metadata = new MediaMetadata({
 			title: song.title,
-			artist: song.artist
+			artist: song.artist,
+			artwork: [
+				{ src: albumArtUrl, sizes: '860x860', type: 'image/jpeg' },
+				{ src: albumArtUrl, sizes: '512x512', type: 'image/jpeg' },
+				{ src: albumArtUrl, sizes: '256x256', type: 'image/jpeg' },
+				{ src: albumArtUrl, sizes: '128x128', type: 'image/jpeg' }
+			]
 		});
+
+		// Set action handlers after playback starts (required for iOS)
+		// Explicitly set seek handlers to null so iOS shows next/prev instead
+		navigator.mediaSession.setActionHandler('play', () => {
+			if (playerReady && !isPlaying) {
+				togglePlayPause();
+			}
+		});
+
+		navigator.mediaSession.setActionHandler('pause', () => {
+			if (playerReady && isPlaying) {
+				togglePlayPause();
+			}
+		});
+
+		navigator.mediaSession.setActionHandler('previoustrack', () => {
+			if (playerReady) {
+				prevSong();
+			}
+		});
+
+		navigator.mediaSession.setActionHandler('nexttrack', () => {
+			if (playerReady) {
+				nextSong();
+			}
+		});
+
+		// Explicitly set seek handlers to null to show track controls instead
+		navigator.mediaSession.setActionHandler('seekbackward', null);
+		navigator.mediaSession.setActionHandler('seekforward', null);
 	}
 });
 
@@ -625,36 +664,6 @@ document.addEventListener('keydown', function(event) {
 	}
 });
 
-// Media key controls
-navigator.mediaSession.metadata = new MediaMetadata({
-	title: 'vibe capsule',
-	artist: 'MP3 Player'
-});
-
-navigator.mediaSession.setActionHandler('play', () => {
-	if (playerReady && !isPlaying) {
-		togglePlayPause();
-	}
-});
-
-navigator.mediaSession.setActionHandler('pause', () => {
-	if (playerReady && isPlaying) {
-		togglePlayPause();
-	}
-});
-
-navigator.mediaSession.setActionHandler('previoustrack', () => {
-	if (playerReady) {
-		prevSong();
-	}
-});
-
-navigator.mediaSession.setActionHandler('nexttrack', () => {
-	if (playerReady) {
-		nextSong();
-	}
-});
-
 // Pre-caching system
 function preloadResources() {
 	console.log('Preloading UI resources...');
@@ -663,7 +672,8 @@ function preloadResources() {
 		'resources/play.png',
 		'resources/pause.png',
 		'resources/prev.png',
-		'resources/next.png'
+		'resources/next.png',
+		'resources/album_art.jpg'
 	];
 
 	const imagePromises = resources.map(src => {
