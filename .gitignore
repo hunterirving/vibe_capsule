@@ -8,6 +8,7 @@ __pycache__/
 # Tracks and playlists
 tracks/
 tracks.json
+resources/album_art.jpg
 
 # Personal notes and ideas
 ideas.md
