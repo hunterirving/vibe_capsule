@@ -8,6 +8,17 @@ const progressContainer = document.getElementById('progressContainer');
 const audio = document.getElementById('audioPlayer');
 audio.controls = true; // Enable controls for iOS media session
 
+const shuffle = false;
+
+function shuffleArray(array) {
+	const shuffled = [...array];
+	for (let i = shuffled.length - 1; i > 0; i--) {
+		const j = Math.floor(Math.random() * (i + 1));
+		[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+	}
+	return shuffled;
+}
+
 let currentSongIndex = 0;
 let isPlaying = false;
 let progressInterval;
@@ -29,7 +40,7 @@ fetch('tracks.json')
 		return response.json();
 	})
 	.then(data => {
-		songs = data;
+		songs = shuffle ? shuffleArray(data) : data;
 		if (songs.length > 0) {
 			playerReady = true;
 			updateCurrentSongDisplay(`Ready to play: ${songs[0].artist} – ${songs[0].title}`);
