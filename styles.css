@@ -231,6 +231,18 @@ body {
 	z-index: 2;
 }
 
+.progress-container::before {
+	content: '';
+	position: absolute;
+	left: 15px;
+	right: 15px;
+	top: 50%;
+	transform: translateY(-50%);
+	margin-top: -3.5px;
+	height: 24px;
+	pointer-events: auto;
+}
+
 .shadow-overlay {
 	position: sticky;
 	top: -1px;
