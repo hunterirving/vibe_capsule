@@ -30,6 +30,7 @@ let preloadedAudio = {}; // Cache for preloaded audio elements
 let currentPreloadIndex = 0;
 let priorityPreloadQueue = []; // Songs requested by user that need priority preloading
 let isPreloadingPriority = false;
+let totalBytesLoaded = 0; // Track total filesize of all preloaded songs
 
 // Load tracks from tracks.json
 fetch('tracks.json')
@@ -715,7 +716,8 @@ function startPreloadingSongs() {
 
 function preloadNextSong() {
 	if (currentPreloadIndex >= songs.length) {
-		console.log('All songs preloaded');
+		const totalMB = (totalBytesLoaded / 1024 / 1024).toFixed(2);
+		console.log(`All songs preloaded - Total size: ${totalMB} MB (${totalBytesLoaded} bytes)`);
 		return;
 	}
 
@@ -745,6 +747,9 @@ function preloadNextSong() {
 			return response.blob();
 		})
 		.then(blob => {
+			// Add blob size to total
+			totalBytesLoaded += blob.size;
+
 			// Create a blob URL that will persist in memory
 			const blobUrl = URL.createObjectURL(blob);
 
