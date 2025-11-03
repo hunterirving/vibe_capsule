@@ -32,8 +32,8 @@ def generate_pwa_manifests():
 		"start_url": "/vibe_capsule/",
 		"scope": "/vibe_capsule/",
 		"display": "standalone",
-		"background_color": "#1a1a1a",
-		"theme_color": "#1a1a1a",
+		"background_color": "#080a0c",
+		"theme_color": "#080a0c",
 		"icons": [
 			{
 				"src": "resources/icon.png",
