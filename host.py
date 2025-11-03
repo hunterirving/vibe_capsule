@@ -167,9 +167,6 @@ def start_server():
 			print("Press Ctrl+C to stop the server")
 			print("=" * 60)
 
-			# Open browser
-			webbrowser.open(local_url)
-
 			# Serve forever
 			httpd.serve_forever()
 
