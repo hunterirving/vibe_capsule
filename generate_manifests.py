@@ -71,10 +71,10 @@ def generate_pwa_manifests():
 	print("✓ Generated resource-manifest.json")
 
 	# Generate service-worker.js
-	all_files = resource_manifest["static_files"] + resource_manifest["tracks"]
+	static_files = resource_manifest["static_files"]
 	service_worker_content = f'''// Auto-generated service worker for vibe capsule PWA
-const CACHE_NAME = 'vibe-capsule-v3';
-const urlsToCache = {json.dumps(all_files, indent=2)};
+const CACHE_NAME = 'vibe-capsule';
+const staticFilesToCache = {json.dumps(static_files, indent=2)};
 
 // Get the base path from the service worker location
 const getBasePath = () => {{
@@ -84,7 +84,8 @@ const getBasePath = () => {{
 
 const basePath = getBasePath();
 
-// Install event - cache all resources
+// Install event - cache only static resources (not MP3s)
+// MP3s will be cached by the main app's blob preloading system
 self.addEventListener('install', (event) => {{
 	console.log('Service Worker installing...', 'Base path:', basePath);
 	event.waitUntil(
@@ -92,24 +93,41 @@ self.addEventListener('install', (event) => {{
 			.then((cache) => {{
 				console.log('Opened cache');
 				// Make URLs absolute relative to service worker location
-				const absoluteUrls = urlsToCache.map(url => {{
+				const absoluteUrls = staticFilesToCache.map(url => {{
 					if (url === './') return basePath;
 					return new URL(url, basePath + 'index.html').href;
 				}});
-				console.log('Caching', absoluteUrls.length, 'resources');
+				console.log('Caching', absoluteUrls.length, 'static resources');
 				console.log('URLs to cache:', absoluteUrls);
 
-				// Cache files one by one with better error handling
-				return Promise.all(
+				// Cache files individually with better error handling
+				// Using Promise.allSettled to continue even if some fail
+				return Promise.allSettled(
 					absoluteUrls.map(url =>
-						cache.add(url)
+						fetch(url)
+							.then(response => {{
+								if (!response.ok) {{
+									throw new Error(`HTTP error! status: ${{response.status}}`);
+								}}
+								return cache.put(url, response);
+							}})
 							.then(() => console.log('✓ Cached:', url))
-							.catch(err => console.error('✗ Failed to cache:', url, err))
+							.catch(err => {{
+								console.error('✗ Failed to cache:', url, err);
+								throw err;
+							}})
 					)
-				);
+				).then(results => {{
+					const failed = results.filter(r => r.status === 'rejected');
+					const succeeded = results.filter(r => r.status === 'fulfilled');
+					console.log(`Cached ${{succeeded.length}}/${{results.length}} static resources`);
+					if (failed.length > 0) {{
+						console.warn(`Failed to cache ${{failed.length}} resources`);
+					}}
+				}});
 			}})
 			.then(() => {{
-				console.log('All resources cached successfully');
+				console.log('Service Worker installation complete');
 				return self.skipWaiting();
 			}})
 			.catch(error => {{
@@ -137,36 +155,50 @@ self.addEventListener('activate', (event) => {{
 
 // Fetch event - serve from cache, fallback to network
 self.addEventListener('fetch', (event) => {{
+	// Ignore non-http(s) requests like blob: URLs, data: URLs, chrome-extension:, etc.
+	if (!event.request.url.startsWith('http')) {{
+		return;
+	}}
+
 	event.respondWith(
 		caches.match(event.request)
 			.then((response) => {{
 				// Cache hit - return response
 				if (response) {{
-					console.log('Serving from cache:', event.request.url);
+					console.log('✓ Serving from cache:', event.request.url);
 					return response;
 				}}
 
 				// Cache miss - try network
-				console.log('Fetching from network:', event.request.url);
+				console.log('⟳ Fetching from network:', event.request.url);
 				return fetch(event.request).then((response) => {{
 					// Check if valid response
-					if (!response || response.status !== 200) {{
+					if (!response || response.status !== 200 || response.type === 'error') {{
 						return response;
 					}}
 
 					// Clone the response for caching
 					const responseToCache = response.clone();
 
+					// Cache the fetched resource
 					caches.open(CACHE_NAME)
 						.then((cache) => {{
 							cache.put(event.request, responseToCache);
-						}});
+							console.log('✓ Cached from network:', event.request.url);
+						}})
+						.catch(err => console.error('Failed to cache:', err));
 
 					return response;
 				}}).catch((error) => {{
-					console.error('Fetch failed; returning offline page if available:', error);
+					console.error('✗ Fetch failed for:', event.request.url, error);
 					// If fetch fails, try to return from cache one more time
-					return caches.match(event.request);
+					return caches.match(event.request).then(cachedResponse => {{
+						if (cachedResponse) {{
+							console.log('✓ Serving from cache (after fetch failed):', event.request.url);
+							return cachedResponse;
+						}}
+						throw error;
+					}});
 				}});
 			}})
 	);

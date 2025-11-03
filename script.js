@@ -44,6 +44,7 @@ let currentPreloadIndex = 0;
 let priorityPreloadQueue = []; // Songs requested by user that need priority preloading
 let isPreloadingPriority = false;
 let totalBytesLoaded = 0; // Track total filesize of all preloaded songs
+let cachedTracks = new Set(); // Track which songs are cached for offline use
 
 // Load tracks from tracks.json
 fetch('tracks.json')
@@ -58,10 +59,13 @@ fetch('tracks.json')
 		if (songs.length > 0) {
 			playerReady = true;
 			updateCurrentSongDisplay(`Ready to play: ${songs[0].artist} – ${songs[0].title}`);
-			renderPlaylist();
-			// Pre-cache resources first, then songs
-			preloadResources().then(() => {
-				startPreloadingSongs();
+			// Check which tracks are already cached before rendering
+			return checkCachedTracks().then(() => {
+				renderPlaylist();
+				// Pre-cache resources first, then songs
+				return preloadResources().then(() => {
+					startPreloadingSongs();
+				});
 			});
 		} else {
 			updateCurrentSongDisplay('No tracks found');
@@ -190,6 +194,12 @@ function renderPlaylist() {
 		}
 		artistDiv.textContent = song.artist;
 
+		// Set cached status for visual indication
+		const isCached = cachedTracks.has(song.filename);
+		if (!isCached) {
+			contentDiv.classList.add('uncached');
+		}
+
 		contentDiv.appendChild(titleDiv);
 		contentDiv.appendChild(artistDiv);
 
@@ -208,7 +218,9 @@ function toggleLooping(index) {
 	if (!playerReady) return;
 	if (index === currentSongIndex) {
 		if (!isPlaying && currentSongDisplay.textContent.includes('Ready to play')) {
-			audio.play();
+			audio.play().catch(err => {
+				console.error('Failed to play audio:', err);
+			});
 			isPlaying = true;
 			updatePlayPauseButton();
 			return;
@@ -222,7 +234,11 @@ function toggleLooping(index) {
 }
 
 function playSong(index) {
-	if (!playerReady) return;
+	console.log(`playSong called with index: ${index}`);
+	if (!playerReady) {
+		console.log('Player not ready');
+		return;
+	}
 	// Clear looping from all songs except the new one if it was already looping
 	const wasLooping = songs[index].looping || false;
 	songs.forEach(song => song.looping = false);
@@ -232,17 +248,57 @@ function playSong(index) {
 
 	currentSongIndex = index;
 	const song = songs[currentSongIndex];
+	console.log(`Attempting to play: ${song.artist} – ${song.title}`);
+	console.log(`Filename: ${song.filename}`);
+	console.log(`Is in preloadedAudio: ${!!preloadedAudio[song.filename]}`);
 
 	// Use preloaded blob if available, otherwise load from server
 	if (preloadedAudio[song.filename]) {
-		audio.src = preloadedAudio[song.filename].blobUrl;
+		const blobUrl = preloadedAudio[song.filename].blobUrl;
+		console.log(`Playing from preloaded blob: ${song.filename}`);
+		console.log(`Blob URL: ${blobUrl}`);
+		audio.src = blobUrl;
 	} else {
+		console.log(`Song not preloaded, loading: ${song.filename}`);
 		audio.src = `tracks/${song.filename}`;
 		// Request priority preloading for this song
 		requestPriorityPreload(song.filename);
 	}
 
-	audio.play();
+	console.log(`Audio src set to: ${audio.src}`);
+
+	// For iOS PWA: We need to call load() and play() synchronously
+	// Reset any previous state first
+	try {
+		audio.pause();
+		audio.currentTime = 0;
+	} catch (e) {
+		// Ignore errors from resetting
+	}
+
+	// Load the audio to ensure it's ready (important for iOS PWA)
+	audio.load();
+
+	// Small delay to let load() initialize, then play
+	// This needs to be synchronous enough that iOS considers it part of the user gesture
+	const playAttempt = audio.play();
+
+	if (playAttempt !== undefined) {
+		playAttempt.then(() => {
+			console.log('Audio playback started successfully');
+			isPlaying = true;
+			updatePlayPauseButton();
+		}).catch(err => {
+			console.error('Failed to play audio:', err);
+			console.error('Error name:', err.name);
+			console.error('Error message:', err.message);
+			isPlaying = false;
+			updatePlayPauseButton();
+			updateCurrentSongDisplay(`Error playing: ${song.title}`);
+		});
+	}
+
+	// Optimistically set playing state
 	isPlaying = true;
 	updatePlayPauseButton();
 	renderPlaylist();
@@ -432,7 +488,11 @@ function togglePlayPause() {
 		if (!audio.src || audio.src === '') {
 			playSong(currentSongIndex);
 		} else {
-			audio.play();
+			audio.play().catch(err => {
+				console.error('Failed to play audio:', err);
+				const song = songs[currentSongIndex];
+				updateCurrentSongDisplay(`Error playing: ${song.title}`);
+			});
 			isPlaying = true;
 		}
 	}
@@ -737,15 +797,32 @@ function preloadNextSong() {
 	const song = songs[currentPreloadIndex];
 	const filename = song.filename;
 
-	// Skip if already preloaded
+	// Skip if already preloaded in memory
 	if (preloadedAudio[filename]) {
 		currentPreloadIndex++;
 		preloadNextSong();
 		return;
 	}
 
-	console.log(`Preloading: ${song.artist} – ${song.title}`);
+	// If already cached, load from cache into memory
+	if (cachedTracks.has(filename)) {
+		console.log(`Loading from cache: ${song.artist} – ${song.title}`);
+		loadFromCache(filename).then(() => {
+			currentPreloadIndex++;
+			setTimeout(() => preloadNextSong(), 100);
+		}).catch(err => {
+			console.error(`Failed to load from cache, fetching instead:`, err);
+			// If cache load fails, fetch from network
+			fetchAndPreloadSong(song, filename);
+		});
+		return;
+	}
 
+	console.log(`Preloading: ${song.artist} – ${song.title}`);
+	fetchAndPreloadSong(song, filename);
+}
+
+function fetchAndPreloadSong(song, filename) {
 	// Use fetch to force full download of the entire file
 	fetch(`tracks/${filename}`)
 		.then(response => {
@@ -806,15 +883,163 @@ function preloadNextSong() {
 
 			console.log(`✓ Fully preloaded: ${song.artist} – ${song.title}`);
 
-			// Move to next song
-			currentPreloadIndex++;
-			setTimeout(() => preloadNextSong(), 100);
+			// Store in Cache API for offline access
+			return storeBlobInCache(filename, blob).then(() => {
+				// Mark as cached and update UI
+				cachedTracks.add(filename);
+				updateTrackCachedStatus(filename);
+
+				// Move to next song
+				currentPreloadIndex++;
+				setTimeout(() => preloadNextSong(), 100);
+			});
 		})
 		.catch(error => {
 			console.error(`Failed to preload ${filename}:`, error);
 			currentPreloadIndex++;
 			preloadNextSong();
 		});
+}
+
+// Check which tracks are already cached on app load
+async function checkCachedTracks() {
+	try {
+		const cache = await caches.open('vibe-capsule');
+		const cachedRequests = await cache.keys();
+
+		// Check each song to see if it's cached
+		for (const song of songs) {
+			const trackUrl = `tracks/${song.filename}`;
+			const isInCache = cachedRequests.some(request => request.url.endsWith(trackUrl));
+			if (isInCache) {
+				cachedTracks.add(song.filename);
+			}
+		}
+
+		console.log(`Found ${cachedTracks.size}/${songs.length} tracks already cached`);
+		console.log('Cached tracks:', Array.from(cachedTracks));
+	} catch (error) {
+		console.error('Failed to check cached tracks:', error);
+	}
+}
+
+// Debug function to check preloaded state
+window.debugAudioState = function() {
+	console.log('=== Audio State Debug ===');
+	console.log('Player ready:', playerReady);
+	console.log('Is playing:', isPlaying);
+	console.log('Current song index:', currentSongIndex);
+	console.log('Total songs:', songs.length);
+	console.log('Cached tracks count:', cachedTracks.size);
+	console.log('Preloaded audio count:', Object.keys(preloadedAudio).length);
+	console.log('Current audio src:', audio.src);
+	console.log('Audio paused:', audio.paused);
+	console.log('Audio error:', audio.error);
+	if (songs[currentSongIndex]) {
+		console.log('Current song:', songs[currentSongIndex].filename);
+		console.log('Is preloaded:', !!preloadedAudio[songs[currentSongIndex].filename]);
+		console.log('Is cached:', cachedTracks.has(songs[currentSongIndex].filename));
+	}
+	console.log('======================');
+};
+
+// Load a track from cache into memory
+async function loadFromCache(filename) {
+	try {
+		const cache = await caches.open('vibe-capsule');
+		// Try both relative and absolute URLs
+		let response = await cache.match(`tracks/${filename}`);
+		if (!response) {
+			// Try with absolute URL
+			const absoluteUrl = new URL(`tracks/${filename}`, window.location.href).href;
+			response = await cache.match(absoluteUrl);
+		}
+
+		if (!response) {
+			throw new Error('Not in cache');
+		}
+
+		const blob = await response.blob();
+
+		// Add blob size to total
+		totalBytesLoaded += blob.size;
+
+		// Create a blob URL that will persist in memory
+		const blobUrl = URL.createObjectURL(blob);
+
+		// Create audio element with the cached blob
+		const preloadAudio = new Audio();
+		preloadAudio.preload = 'auto';
+		preloadAudio.src = blobUrl;
+
+		// Wait for the audio element to fully buffer the blob
+		return new Promise((resolve) => {
+			const checkBuffered = () => {
+				// Check if the entire duration is buffered
+				if (preloadAudio.duration > 0 && preloadAudio.buffered.length > 0) {
+					const bufferedEnd = preloadAudio.buffered.end(preloadAudio.buffered.length - 1);
+					if (bufferedEnd >= preloadAudio.duration - 0.1) {
+						// Fully buffered!
+						preloadedAudio[filename] = {
+							audio: preloadAudio,
+							blobUrl: blobUrl,
+							blob: blob
+						};
+						console.log(`✓ Loaded from cache: ${filename}`);
+						resolve();
+						return;
+					}
+				}
+				// Not fully buffered yet, check again soon
+				setTimeout(checkBuffered, 100);
+			};
+
+			// Start checking once metadata is loaded
+			preloadAudio.addEventListener('loadedmetadata', () => {
+				checkBuffered();
+			}, { once: true });
+
+			// Trigger the loading
+			preloadAudio.load();
+		});
+	} catch (error) {
+		console.error(`Failed to load from cache: ${filename}`, error);
+		throw error;
+	}
+}
+
+// Store blob in Cache API for offline access
+async function storeBlobInCache(filename, blob) {
+	try {
+		const cache = await caches.open('vibe-capsule');
+		const response = new Response(blob, {
+			headers: {
+				'Content-Type': 'audio/mpeg',
+				'Content-Length': blob.size
+			}
+		});
+		// Use absolute URL for consistency
+		const absoluteUrl = new URL(`tracks/${filename}`, window.location.href).href;
+		await cache.put(absoluteUrl, response);
+		console.log(`✓ Cached for offline: ${filename}`);
+	} catch (error) {
+		console.error(`Failed to cache ${filename}:`, error);
+	}
+}
+
+// Update UI to show track is cached
+function updateTrackCachedStatus(filename) {
+	const songIndex = songs.findIndex(s => s.filename === filename);
+	if (songIndex === -1) return;
+
+	// Find the playlist item and remove uncached class
+	const playlistItems = playlist.querySelectorAll('.playlist-item');
+	if (playlistItems[songIndex]) {
+		const contentDiv = playlistItems[songIndex].querySelector('.playlist-item-content');
+		if (contentDiv) {
+			contentDiv.classList.remove('uncached');
+		}
+	}
 }
 
 // Priority preloading system
@@ -855,8 +1080,23 @@ function processPriorityPreload() {
 		return;
 	}
 
-	console.log(`🔥 Priority preloading: ${song.artist} – ${song.title}`);
+	// If already cached, load from cache
+	if (cachedTracks.has(filename)) {
+		console.log(`🔥 Priority loading from cache: ${song.artist} – ${song.title}`);
+		loadFromCache(filename).then(() => {
+			processPriorityPreload();
+		}).catch(err => {
+			console.error(`Failed to load from cache, fetching instead:`, err);
+			priorityFetchAndPreloadSong(song, filename);
+		});
+		return;
+	}
 
+	console.log(`🔥 Priority preloading: ${song.artist} – ${song.title}`);
+	priorityFetchAndPreloadSong(song, filename);
+}
+
+function priorityFetchAndPreloadSong(song, filename) {
 	// Use fetch to force full download of the entire file
 	fetch(`tracks/${filename}`)
 		.then(response => {
@@ -923,8 +1163,15 @@ function processPriorityPreload() {
 				}
 			}
 
-			// Process next priority request
-			processPriorityPreload();
+			// Store in Cache API for offline access
+			return storeBlobInCache(filename, blob).then(() => {
+				// Mark as cached and update UI
+				cachedTracks.add(filename);
+				updateTrackCachedStatus(filename);
+
+				// Process next priority request
+				processPriorityPreload();
+			});
 		})
 		.catch(error => {
 			// Ignore abort errors (happens when normal preload finishes first)

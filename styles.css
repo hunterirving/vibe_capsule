@@ -145,6 +145,11 @@ body {
 	display: flex;
 	flex-direction: column;
 	gap: 2px;
+	transition: opacity 0.3s ease;
+}
+
+.playlist-item-content.uncached {
+	opacity: 0.4;
 }
 
 .playlist-item-title {
