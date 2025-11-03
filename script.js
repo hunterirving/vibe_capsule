@@ -1,3 +1,16 @@
+// Register service worker for PWA functionality
+if ('serviceWorker' in navigator) {
+	window.addEventListener('load', () => {
+		navigator.serviceWorker.register('service-worker.js')
+			.then(registration => {
+				console.log('Service Worker registered successfully:', registration.scope);
+			})
+			.catch(error => {
+				console.log('Service Worker registration failed:', error);
+			});
+	});
+}
+
 const playPauseBtn = document.getElementById('playPause');
 const prevBtn = document.getElementById('prev');
 const nextBtn = document.getElementById('next');
@@ -56,7 +69,7 @@ fetch('tracks.json')
 	})
 	.catch(error => {
 		console.error('Error loading tracks:', error);
-		updateCurrentSongDisplay('Error: tracks.json not found. Run scan.py first.');
+		updateCurrentSongDisplay('Unable to load tracks. Please check your connection.');
 	});
 
 // Audio event listeners

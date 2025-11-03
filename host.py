@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 """
-Simple HTTP Server for vibe capsule MP3 player
-Starts server and opens browser automatically
+Starts HTTP server for local testing
 Automatically manages a virtual environment for dependencies
 """
 
 import http.server
 import socketserver
-import webbrowser
 import socket
 import sys
 import os

@@ -22,3 +22,11 @@ ideas.md
 *.swp
 *.swo
 *~
+
+# auto-generated PWA files
+manifest.json
+resource-manifest.json
+service-worker.js
+
+# Deployment script (personal)
+push.py
