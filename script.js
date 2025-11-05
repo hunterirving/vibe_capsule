@@ -99,7 +99,8 @@ audio.addEventListener('play', () => {
 	// Update media session metadata
 	if ('mediaSession' in navigator) {
 		// Convert relative path to absolute URL for media session
-		const albumArtUrl = new URL('resources/album_art.jpg', window.location.href).href;
+		// Use document.baseURI to correctly resolve paths in subdirectories
+		const albumArtUrl = new URL('resources/album_art.jpg', document.baseURI).href;
 		navigator.mediaSession.metadata = new MediaMetadata({
 			title: song.title,
 			artist: song.artist,
@@ -843,40 +844,7 @@ function fetchAndPreloadSong(song, filename) {
 			// Create a blob URL that will persist in memory
 			const blobUrl = URL.createObjectURL(blob);
 
-			// Create audio element with the fully downloaded blob
-			const preloadAudio = new Audio();
-			preloadAudio.preload = 'auto';
-			preloadAudio.src = blobUrl;
-
-			// Wait for the audio element to fully buffer the blob
-			return new Promise((resolve) => {
-				const checkBuffered = () => {
-					// Check if the entire duration is buffered
-					if (preloadAudio.duration > 0 && preloadAudio.buffered.length > 0) {
-						const bufferedEnd = preloadAudio.buffered.end(preloadAudio.buffered.length - 1);
-						if (bufferedEnd >= preloadAudio.duration - 0.1) {
-							// Fully buffered!
-							resolve({ preloadAudio, blobUrl, blob });
-							return;
-						}
-					}
-					// Not fully buffered yet, check again soon
-					setTimeout(checkBuffered, 100);
-				};
-
-				// Start checking once metadata is loaded
-				preloadAudio.addEventListener('loadedmetadata', () => {
-					checkBuffered();
-				}, { once: true });
-
-				// Trigger the loading
-				preloadAudio.load();
-			});
-		})
-		.then(({ preloadAudio, blobUrl, blob }) => {
-			// Store both the audio element and blob URL
 			preloadedAudio[filename] = {
-				audio: preloadAudio,
 				blobUrl: blobUrl,
 				blob: blob
 			};
@@ -967,41 +935,11 @@ async function loadFromCache(filename) {
 		// Create a blob URL that will persist in memory
 		const blobUrl = URL.createObjectURL(blob);
 
-		// Create audio element with the cached blob
-		const preloadAudio = new Audio();
-		preloadAudio.preload = 'auto';
-		preloadAudio.src = blobUrl;
-
-		// Wait for the audio element to fully buffer the blob
-		return new Promise((resolve) => {
-			const checkBuffered = () => {
-				// Check if the entire duration is buffered
-				if (preloadAudio.duration > 0 && preloadAudio.buffered.length > 0) {
-					const bufferedEnd = preloadAudio.buffered.end(preloadAudio.buffered.length - 1);
-					if (bufferedEnd >= preloadAudio.duration - 0.1) {
-						// Fully buffered!
-						preloadedAudio[filename] = {
-							audio: preloadAudio,
-							blobUrl: blobUrl,
-							blob: blob
-						};
-						console.log(`✓ Loaded from cache: ${filename}`);
-						resolve();
-						return;
-					}
-				}
-				// Not fully buffered yet, check again soon
-				setTimeout(checkBuffered, 100);
-			};
-
-			// Start checking once metadata is loaded
-			preloadAudio.addEventListener('loadedmetadata', () => {
-				checkBuffered();
-			}, { once: true });
-
-			// Trigger the loading
-			preloadAudio.load();
-		});
+		preloadedAudio[filename] = {
+			blobUrl: blobUrl,
+			blob: blob
+		};
+		console.log(`✓ Loaded from cache: ${filename}`);
 	} catch (error) {
 		console.error(`Failed to load from cache: ${filename}`, error);
 		throw error;
@@ -1109,59 +1047,13 @@ function priorityFetchAndPreloadSong(song, filename) {
 			// Create a blob URL that will persist in memory
 			const blobUrl = URL.createObjectURL(blob);
 
-			// Create audio element with the fully downloaded blob
-			const preloadAudio = new Audio();
-			preloadAudio.preload = 'auto';
-			preloadAudio.src = blobUrl;
-
-			// Wait for the audio element to fully buffer the blob
-			return new Promise((resolve) => {
-				const checkBuffered = () => {
-					// Check if the entire duration is buffered
-					if (preloadAudio.duration > 0 && preloadAudio.buffered.length > 0) {
-						const bufferedEnd = preloadAudio.buffered.end(preloadAudio.buffered.length - 1);
-						if (bufferedEnd >= preloadAudio.duration - 0.1) {
-							// Fully buffered!
-							resolve({ preloadAudio, blobUrl, blob });
-							return;
-						}
-					}
-					// Not fully buffered yet, check again soon
-					setTimeout(checkBuffered, 100);
-				};
-
-				// Start checking once metadata is loaded
-				preloadAudio.addEventListener('loadedmetadata', () => {
-					checkBuffered();
-				}, { once: true });
-
-				// Trigger the loading
-				preloadAudio.load();
-			});
-		})
-		.then(({ preloadAudio, blobUrl, blob }) => {
-			// Store both the audio element and blob URL
 			preloadedAudio[filename] = {
-				audio: preloadAudio,
 				blobUrl: blobUrl,
 				blob: blob
 			};
 
-			// Switch to the preloaded version if this is the current song
-			if (songs[currentSongIndex].filename === filename && audio.src !== blobUrl) {
-				const currentTime = audio.currentTime;
-				const wasPlaying = !audio.paused;
-				audio.src = blobUrl;
-				audio.currentTime = currentTime;
-				if (wasPlaying) {
-					audio.play().catch(err => {
-						// Ignore play interruption errors (expected during source switching)
-						if (err.name !== 'AbortError') {
-							console.error('Error resuming playback:', err);
-						}
-					});
-				}
-			}
+			// Next time this song plays, it will use the cached version
+			console.log(`✓ Priority preloaded: ${song.artist} – ${song.title}`);
 
 			// Store in Cache API for offline access
 			return storeBlobInCache(filename, blob).then(() => {
