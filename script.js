@@ -529,12 +529,48 @@ function startProgressBar() {
 	}
 
 	animate();
+
+	// iOS PWA background playback fix: use setInterval as backup
+	// setInterval is less throttled than requestAnimationFrame in background
+	backgroundPlaybackCheckInterval = setInterval(() => {
+		if (!audio.paused && audio.duration && audio.currentTime >= audio.duration - 0.5) {
+			console.log('Background check: song ended, triggering next');
+			clearInterval(backgroundPlaybackCheckInterval);
+			backgroundPlaybackCheckInterval = null;
+
+			if (songs[currentSongIndex].looping) {
+				audio.currentTime = 0;
+				audio.play();
+			} else {
+				nextSong();
+			}
+		}
+
+		// Update Media Session position state for iOS
+		if ('mediaSession' in navigator && 'setPositionState' in navigator.mediaSession) {
+			try {
+				if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
+					navigator.mediaSession.setPositionState({
+						duration: audio.duration,
+						playbackRate: audio.playbackRate,
+						position: audio.currentTime
+					});
+				}
+			} catch (e) {
+				// Ignore errors from setPositionState
+			}
+		}
+	}, 500); // Check every 500ms
 }
 
 function stopProgressBar() {
 	if (animationFrameId !== null) {
 		cancelAnimationFrame(animationFrameId);
 		animationFrameId = null;
+	}
+	if (backgroundPlaybackCheckInterval !== null) {
+		clearInterval(backgroundPlaybackCheckInterval);
+		backgroundPlaybackCheckInterval = null;
 	}
 }
 
@@ -555,6 +591,7 @@ function updateProgressBar() {
 let isDragging = false;
 let wasPlayingBeforeDrag = false;
 let pendingSeekPercentage = null;
+let backgroundPlaybackCheckInterval = null;
 
 function updateVisualProgress(event) {
 	if (!playerReady) return;
