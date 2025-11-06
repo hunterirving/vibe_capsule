@@ -5,10 +5,35 @@ based on the contents of tracks.json
 """
 
 import json
+import re
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).parent.absolute()
 TRACKS_JSON = SCRIPT_DIR / "tracks.json"
+STYLES_CSS = SCRIPT_DIR / "styles.css"
+
+
+def get_background_color():
+	"""Extract the --background CSS variable from styles.css"""
+	if not STYLES_CSS.exists():
+		print("Warning: styles.css not found. Using default color.")
+		return "#080a0c"
+
+	with open(STYLES_CSS, 'r', encoding='utf-8') as f:
+		content = f.read()
+
+	# Look for --background: <color>; pattern
+	match = re.search(
+		r'--background:\s*([#a-zA-Z0-9(),.\s]+?)\s*;',
+		content
+	)
+	if match:
+		color = match.group(1).strip()
+		print(f"Found background color in styles.css: {color}")
+		return color
+
+	print("Warning: --background not found in styles.css. Using default color.")
+	return "#080a0c"
 
 
 def generate_pwa_manifests():
@@ -23,6 +48,9 @@ def generate_pwa_manifests():
 	with open(TRACKS_JSON, 'r', encoding='utf-8') as f:
 		tracks = json.load(f)
 
+	# Get background color from styles.css
+	background_color = get_background_color()
+
 	# Generate manifest.json
 	manifest = {
 		"id": "/vibe_capsule/",
@@ -32,8 +60,8 @@ def generate_pwa_manifests():
 		"start_url": "/vibe_capsule/",
 		"scope": "/vibe_capsule/",
 		"display": "standalone",
-		"background_color": "#080a0c",
-		"theme_color": "#080a0c",
+		"background_color": background_color,
+		"theme_color": background_color,
 		"icons": [
 			{
 				"src": "resources/icon.png",
