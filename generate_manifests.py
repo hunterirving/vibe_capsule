@@ -8,6 +8,16 @@ import json
 import re
 from pathlib import Path
 
+# Configuration - Edit these for your deployment
+BASE_PATH = "/vibe_capsule/"  # Path where this PWA will be hosted (e.g., "/" for root, "/my-playlist/" for subdirectory)
+APP_NAME = "vibe capsule"
+
+# Derived values (can be manually overridden if desired)
+SHORT_NAME = APP_NAME
+CACHE_NAME = APP_NAME
+APP_DESCRIPTION = f"{APP_NAME} · vibe capsule"
+
+# File paths (no need to edit these)
 SCRIPT_DIR = Path(__file__).parent.absolute()
 TRACKS_JSON = SCRIPT_DIR / "tracks.json"
 STYLES_CSS = SCRIPT_DIR / "styles.css"
@@ -53,12 +63,12 @@ def generate_pwa_manifests():
 
 	# Generate manifest.json
 	manifest = {
-		"id": "/vibe_capsule/",
-		"name": "vibe capsule",
-		"short_name": "vibe capsule",
-		"description": "mixtape as artifact",
-		"start_url": "/vibe_capsule/",
-		"scope": "/vibe_capsule/",
+		"id": BASE_PATH,
+		"name": APP_NAME,
+		"short_name": SHORT_NAME,
+		"description": APP_DESCRIPTION,
+		"start_url": BASE_PATH,
+		"scope": BASE_PATH,
 		"display": "standalone",
 		"background_color": background_color,
 		"theme_color": background_color,
@@ -100,8 +110,8 @@ def generate_pwa_manifests():
 
 	# Generate service-worker.js
 	static_files = resource_manifest["static_files"]
-	service_worker_content = f'''// Auto-generated service worker for vibe capsule PWA
-const CACHE_NAME = 'vibe-capsule';
+	service_worker_content = f'''// Auto-generated service worker for {APP_NAME} PWA
+const CACHE_NAME = '{CACHE_NAME}';
 const staticFilesToCache = {json.dumps(static_files, indent=2)};
 
 // Get the base path from the service worker location
