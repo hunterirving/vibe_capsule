@@ -48,7 +48,8 @@ it's **yours** and then it's **theirs**.
 4. **deploy your playlist** as a Progressive Web App
 	- upload the entire project directory to any web host with HTTPS support (GitHub Pages, AWS S3, etc.)
 	- visit your hosted URL and follow your browser's prompts to "install" or "add app to home screen" (detailed instructions <a href="https://hunterirving.github.io/web_workshop/pwa">here</a>)
-	- once installed, the app works completely offline and runs like a native application
+	- once installed, the app works completely offline and runs like a native application:<br><br>
+	<img src="readme_images/lock_screen.jpeg" width="300">
 
 ## requirements
 - python 3.x
