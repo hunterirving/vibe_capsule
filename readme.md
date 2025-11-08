@@ -2,7 +2,7 @@
 
 turn a folder of .mp3 files into a progressive web app, resurrecting the lost art of <a href="https://ihavethatonvinyl.com/liner-notes/the-lost-art-of-the-mixtape/">mixtape</a><a href="https://melos.audio/blogs/information/the-lost-art-of-the-mixtape">-making</a>.
 
-<img src="readme_images/collection.jpeg" width="600">
+<img src="readme_images/collection.jpeg" width="550">
 
 ## live demo
 <a href="https://hunterirving.com/vibe_capsule">public domain beats to code to ↗</a>
@@ -13,12 +13,12 @@ turn a folder of .mp3 files into a progressive web app, resurrecting the lost ar
 - keyboard media key support (▶️, ⏸️, ⏭️, ⏮️)
 - highly customizable interface (just add CSS)
 
-<img src="readme_images/playlist.png" width="450">
+<img src="readme_images/playlist.png" width="500">
 
 ## own something and be happy
 modern playlist sharing is ephemeral and platform-locked. shared playlists often require a paid subscription, can be modified after sharing, and decay as licenses expire.
 > [!WARNING]
-> This song is no longer available in your country or region.
+> <i>This song is no longer available in your country or region.</i>
 
 in the transition from physical mixtapes to cloud-hosted playlists, we lost the ability to give each other digital things. these days, we mostly point to things that we don't control.
 
